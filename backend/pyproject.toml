@@ -1,0 +1,73 @@
+[project]
+name = "factorymanager-ai"
+version = "1.0.0"
+description = "The AI Plant Manager for MSME manufacturing"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 92
+target-version = "py312"
+src = ["."]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # import sorting
+    "B",         # bugbear
+    "UP",        # pyupgrade
+    "C4",        # comprehensions
+    "SIM",       # simplify
+    "RUF",       # ruff-specific
+    "ASYNC",     # async correctness — the one that matters most here
+    "S",         # security
+    "DTZ",       # naive datetimes
+]
+ignore = [
+    # FastAPI's dependency-injection idiom is a function call in a default
+    # argument. It is the framework's entire API surface.
+    "B008",
+    # `except Exception` is deliberate in the worker loop and the WebSocket
+    # fan-out: one bad row must not stop escalations for every plant, and a
+    # tablet that walked out of Wi-Fi range must not tear down the channel.
+    # Each occurrence is commented where it appears.
+    "BLE001",
+    "S101",    # assert — used in tests and in one runtime invariant
+    "E501",    # line length is handled by the formatter
+    "RUF012",  # ClassVar annotations on SQLAlchemy declarative attrs
+    # `class X(str, Enum)` is deliberate over `StrEnum`: it is what Pydantic and
+    # SQLAlchemy documentation both use, and the codebase relies on `.value`
+    # being explicit at every boundary.
+    "UP042",
+    # The ₹ symbol and → arrows appear throughout docstrings and comments
+    # because the domain is Indian manufacturing. They are not typos.
+    "RUF001", "RUF002", "RUF003",
+    # "token_type", "secret_key" — parameter names, not credentials.
+    "S105", "S106", "S107",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Package __init__ files re-export deliberately, so every import is "unused".
+"app/kernel/__init__.py" = ["F401", "F403", "F405"]
+"app/models/__init__.py" = ["F401", "F403", "F405"]
+"app/schemas/__init__.py" = ["F401"]
+"app/api/v1/__init__.py" = ["F401"]
+# `date.today()` is correct for a business date: the plant's day is a local
+# calendar concept resolved once at shift start, not an instant in time.
+"tests/*" = ["DTZ011", "DTZ001", "S105", "S106"]
+"scripts/*" = ["DTZ011", "S311"]  # seed uses `random` for demo data, not crypto
+"app/services/*" = ["DTZ011"]
+"app/ai/*" = ["DTZ011"]
+"app/api/*" = ["DTZ011"]
+"app/workers/*" = ["DTZ011"]
+"app/models/*" = ["DTZ011"]
+"alembic/*" = ["F401", "I001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"

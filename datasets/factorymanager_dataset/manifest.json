@@ -1,0 +1,374 @@
+{
+  "product": "FactoryManager AI",
+  "schema_revision": "0ba4b6bb4343 (plugin tables: compliance, kaizen, skills)",
+  "seed": 20260913,
+  "as_of": "2026-09-12",
+  "data_stops_at": "2026-09-12T11:20:00+05:30",
+  "generated_at": "2026-09-13T06:59:31+00:00",
+  "timezone_note": "All timestamps are Asia/Kolkata (+05:30). Money columns are integer paise (100 paise = ₹1).",
+  "total_rows": 111308,
+  "tables": {
+    "plants": 4,
+    "users": 37,
+    "alert_recipients": 35,
+    "audit_log": 1074,
+    "audit_packs": 12,
+    "compliance_clauses": 65,
+    "copilot_queries": 730,
+    "cost_families": 22,
+    "cost_rates": 38,
+    "defect_codes": 42,
+    "margin_band_values": 30,
+    "operators": 124,
+    "parts": 39,
+    "readiness_assessments": 60,
+    "reason_codes": 82,
+    "shifts": 13,
+    "template_uploads": 31,
+    "user_plant_roles": 43,
+    "coach_briefings": 770,
+    "job_orders": 449,
+    "routing_operations": 155,
+    "shift_sessions": 534,
+    "stations": 55,
+    "actions": 650,
+    "lots": 608,
+    "operator_skills": 357,
+    "production_targets": 139,
+    "dispatch_records": 1926,
+    "job_sessions": 7506,
+    "kaizen_ideas": 111,
+    "memory_entries": 531,
+    "recovered_profit_entries": 2231,
+    "root_cause_analyses": 185,
+    "stage_completions": 11855,
+    "training_needs": 43,
+    "downtime_events": 3675,
+    "production_counts": 59917,
+    "quality_records": 5015,
+    "action_events": 1493,
+    "escalations": 10622
+  },
+  "plants": [
+    {
+      "code": "KUMARAN",
+      "name": "Kumaran Auto Components",
+      "location": "Hosur, Tamil Nadu",
+      "costing_mode": "standard",
+      "go_live": "2026-06-01",
+      "lot_granularity": "job_lot",
+      "shifts": [
+        "Shift A",
+        "Shift B"
+      ]
+    },
+    {
+      "code": "SRIVARI",
+      "name": "Sri Vari Pressings Pvt Ltd",
+      "location": "Ambattur Industrial Estate, Chennai, Tamil Nadu",
+      "costing_mode": "basic",
+      "go_live": "2026-06-15",
+      "lot_granularity": "shift_batch",
+      "shifts": [
+        "Shift A",
+        "Shift B",
+        "Shift C"
+      ]
+    },
+    {
+      "code": "KOVAI",
+      "name": "Kovai Precision Engineering",
+      "location": "SIDCO Industrial Estate, Kurichi, Coimbatore, Tamil Nadu",
+      "costing_mode": "standard",
+      "go_live": "2026-07-20",
+      "lot_granularity": "job_lot",
+      "shifts": [
+        "Shift 1",
+        "Shift 2"
+      ]
+    },
+    {
+      "code": "SAKTHI",
+      "name": "Sakthi Fasteners & Forgings",
+      "location": "SIPCOT Sriperumbudur, Kanchipuram, Tamil Nadu",
+      "costing_mode": "basic",
+      "go_live": "2026-08-24",
+      "lot_granularity": "day_batch",
+      "shifts": [
+        "Shift I",
+        "Shift II"
+      ]
+    }
+  ],
+  "onboarding_forms": {
+    "KUMARAN": {
+      "T1": 18,
+      "T2": 12,
+      "T3": 41,
+      "T4": 12,
+      "T5": 41,
+      "T6": 29,
+      "T7": 18
+    },
+    "SRIVARI": {
+      "T1": 15,
+      "T2": 9,
+      "T3": 35,
+      "T4": 10,
+      "T5": 48,
+      "T6": 32,
+      "T7": 16
+    },
+    "KOVAI": {
+      "T1": 13,
+      "T2": 8,
+      "T3": 34,
+      "T4": 11,
+      "T5": 32,
+      "T6": 29,
+      "T7": 13
+    },
+    "SAKTHI": {
+      "T1": 9,
+      "T2": 6,
+      "T3": 27,
+      "T4": 5,
+      "T5": 26,
+      "T6": 30,
+      "T7": 9
+    }
+  },
+  "demo_logins": [
+    {
+      "plant": "ALL",
+      "name": "Arjun Mehta",
+      "role": "consultant",
+      "login": "consultant@factorymanager.ai",
+      "password": "consult1234"
+    },
+    {
+      "plant": "ALL",
+      "name": "Platform Admin",
+      "role": "admin",
+      "login": "admin@factorymanager.ai",
+      "password": "admin1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Mr. Kumaran",
+      "role": "owner",
+      "login": "owner@kumaranauto.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Murugan V.",
+      "role": "supervisor",
+      "login": "+919000000011",
+      "password": "shift1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Kavitha R.",
+      "role": "quality",
+      "login": "+919000000012",
+      "password": "quality1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Suresh K.",
+      "role": "maintenance",
+      "login": "+919000000013",
+      "password": "maint1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Ramesh P.",
+      "role": "stores",
+      "login": "+919000000014",
+      "password": "stores1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Anitha D.",
+      "role": "supervisor",
+      "login": "+919000000015",
+      "password": "plant1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Senthil Kumar R.",
+      "role": "supervisor",
+      "login": "+919000000016",
+      "password": "shift1234"
+    },
+    {
+      "plant": "KUMARAN",
+      "name": "Priya S.",
+      "role": "quality",
+      "login": "+919000000017",
+      "password": "quality1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Mr. Venkatesan S.",
+      "role": "owner",
+      "login": "owner@srivaripressings.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Lakshmi Narayanan K.",
+      "role": "supervisor",
+      "login": "+919100000101",
+      "password": "plant1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Palanisamy R.",
+      "role": "supervisor",
+      "login": "+919100000102",
+      "password": "shift1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Chandrasekar M.",
+      "role": "supervisor",
+      "login": "+919100000103",
+      "password": "shift1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Thangaraj V.",
+      "role": "supervisor",
+      "login": "+919100000104",
+      "password": "shift1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Revathi M.",
+      "role": "quality",
+      "login": "+919100000105",
+      "password": "quality1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Karpagam S.",
+      "role": "quality",
+      "login": "+919100000106",
+      "password": "quality1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Balamurugan T.",
+      "role": "maintenance",
+      "login": "+919100000107",
+      "password": "maint1234"
+    },
+    {
+      "plant": "SRIVARI",
+      "name": "Jayakumar P.",
+      "role": "stores",
+      "login": "+919100000108",
+      "password": "stores1234"
+    },
+    {
+      "plant": "KOVAI",
+      "name": "Ms. Deepa Ramasamy",
+      "role": "owner",
+      "login": "owner@kovaiprecision.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "KOVAI",
+      "name": "Karthikeyan V.",
+      "role": "supervisor",
+      "login": "+919200000201",
+      "password": "plant1234"
+    },
+    {
+      "plant": "KOVAI",
+      "name": "Sivakumar N.",
+      "role": "supervisor",
+      "login": "+919200000202",
+      "password": "shift1234"
+    },
+    {
+      "plant": "KOVAI",
+      "name": "Rajesh Babu M.",
+      "role": "supervisor",
+      "login": "+919200000203",
+      "password": "shift1234"
+    },
+    {
+      "plant": "KOVAI",
+      "name": "Nandhini P.",
+      "role": "quality",
+      "login": "+919200000204",
+      "password": "quality1234"
+    },
+    {
+      "plant": "KOVAI",
+      "name": "Gunasekaran A.",
+      "role": "maintenance",
+      "login": "+919200000205",
+      "password": "maint1234"
+    },
+    {
+      "plant": "KOVAI",
+      "name": "Manoj Kumar S.",
+      "role": "stores",
+      "login": "+919200000206",
+      "password": "stores1234"
+    },
+    {
+      "plant": "SAKTHI",
+      "name": "Mr. Sakthivel P.",
+      "role": "owner",
+      "login": "owner@sakthifasteners.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "SAKTHI",
+      "name": "Muthukumar R.",
+      "role": "supervisor",
+      "login": "+919300000301",
+      "password": "plant1234"
+    },
+    {
+      "plant": "SAKTHI",
+      "name": "Ganesan K.",
+      "role": "supervisor",
+      "login": "+919300000302",
+      "password": "shift1234"
+    },
+    {
+      "plant": "SAKTHI",
+      "name": "Arumugam S.",
+      "role": "supervisor",
+      "login": "+919300000303",
+      "password": "shift1234"
+    },
+    {
+      "plant": "SAKTHI",
+      "name": "Sangeetha R.",
+      "role": "quality",
+      "login": "+919300000304",
+      "password": "quality1234"
+    },
+    {
+      "plant": "SAKTHI",
+      "name": "Elango V.",
+      "role": "maintenance",
+      "login": "+919300000305",
+      "password": "maint1234"
+    },
+    {
+      "plant": "SAKTHI",
+      "name": "Pandian M.",
+      "role": "stores",
+      "login": "+919300000306",
+      "password": "stores1234"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# Layer 3/4 — Copilot, Factory Memory retrieval, ML.
+# Split from requirements.txt so the API image stays small and the AI worker
+# can be scaled (or switched off) independently.
+-r requirements.txt
+
+# RAG over the plant's own data
+llama-index-core==0.14.3
+llama-index-embeddings-huggingface==0.6.1
+llama-index-vector-stores-postgres==0.6.2
+
+# LLM serving — vLLM exposes an OpenAI-compatible API; we speak to it over HTTP
+# rather than importing it, so the API process never loads a model into memory.
+openai==2.1.0
+
+# Pattern detection for the Coach (Tier 2-3) and Kaizen scoring
+scikit-learn==1.7.2
+xgboost==3.0.5
+numpy==2.3.3

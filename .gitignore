@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+
+# Environment — .env.example is committed, .env is not
+.env
+.env.*
+!.env.example
+
+# Local data
+*.sqlite3
+pgdata/
+
+# Database backups
+backups/
+*.log
+
+# Uploaded photos (backend/storage)
+storage/

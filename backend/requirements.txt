@@ -1,0 +1,35 @@
+# --- API ---------------------------------------------------------------------
+fastapi==0.118.0
+uvicorn[standard]==0.37.0
+pydantic==2.11.9
+pydantic-settings==2.11.0
+python-multipart==0.0.20
+websockets==15.0.1
+
+# --- Data --------------------------------------------------------------------
+sqlalchemy[asyncio]==2.0.43
+# psycopg3 rather than asyncpg: one driver serves both the async app and
+# Alembic's synchronous migrations, so there is no second connection stack to
+# keep configured and no second set of type adapters to reason about.
+psycopg[binary,pool]==3.2.9
+alembic==1.16.5
+greenlet==3.2.4
+
+# --- Cache / queue -----------------------------------------------------------
+redis==6.4.0
+
+# --- Auth --------------------------------------------------------------------
+pyjwt==2.10.1
+argon2-cffi==25.1.0
+
+# --- Ingest (T1-T7 templates, §15) -------------------------------------------
+openpyxl==3.1.5
+pandas==2.3.2
+
+# --- Messaging (§9: sensor feed enters through the same contract) ------------
+# The MQTT seam is served by EMQX's rule engine posting to our ingest endpoint
+# (infra/emqx/rules.md), so the API process needs no MQTT client of its own.
+httpx==0.28.1
+
+# --- Observability -----------------------------------------------------------
+structlog==25.4.0

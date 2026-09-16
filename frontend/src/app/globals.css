@@ -1,0 +1,472 @@
+@import "tailwindcss";
+
+/*
+ * FactoryManager AI — design system.
+ *
+ * The brief from §7 is unusual and it shapes everything here:
+ *
+ *   "Every screen designed for thick fingers, poor light, and a hurry."
+ *   "Readable from 5 metres."  (Morning Meeting Mode)
+ *   "The owner's home is money, not machines."
+ *
+ * So the polish is spent on craft, not ornament: a precise type scale, layered
+ * elevation, state that reads through glow as well as colour, and money given a
+ * typographic treatment nothing else gets. Touch targets stay large — premium
+ * here never means small.
+ *
+ * Colour is defined in OKLCH. Perceptual uniformity matters when the same
+ * palette has to survive a sun-washed tablet on a shop floor and a projector in
+ * a morning meeting.
+ */
+
+@theme {
+  /* ---- Ink: the surface family --------------------------------------- */
+  /* Warm-neutral rather than blue-grey. Under the yellow-green cast of
+     shopfloor fluorescents, a cool grey turns muddy; this stays clean. */
+  --color-ink-25:  oklch(99.2% 0.002 80);
+  --color-ink-50:  oklch(98.2% 0.003 80);
+  --color-ink-100: oklch(96.3% 0.004 80);
+  --color-ink-150: oklch(94.0% 0.005 80);
+  --color-ink-200: oklch(90.8% 0.006 78);
+  --color-ink-300: oklch(83.0% 0.008 76);
+  --color-ink-400: oklch(70.5% 0.010 74);
+  --color-ink-500: oklch(58.0% 0.011 72);
+  --color-ink-600: oklch(46.5% 0.012 70);
+  --color-ink-700: oklch(36.5% 0.013 68);
+  --color-ink-800: oklch(27.0% 0.013 66);
+  --color-ink-850: oklch(22.5% 0.013 65);
+  --color-ink-900: oklch(18.0% 0.012 64);
+  --color-ink-950: oklch(13.5% 0.011 62);
+  --color-ink-1000: oklch(9.5% 0.010 60);
+
+  /* ---- Machine state --------------------------------------------------- */
+  /* Green/red is the universal shopfloor language, so we keep it — but state
+     is carried by glow, ring weight and a text label too, because roughly one
+     man in twelve has a red-green deficiency and this is a male-dominated floor. */
+  --color-running: oklch(62.0% 0.170 152);
+  --color-running-bright: oklch(72.0% 0.190 152);
+  --color-running-dim: oklch(94.5% 0.045 152);
+  --color-stopped: oklch(57.5% 0.215 27);
+  --color-stopped-bright: oklch(66.0% 0.230 27);
+  --color-stopped-dim: oklch(94.0% 0.040 27);
+  --color-idle: oklch(70.0% 0.010 74);
+
+  /* ---- Money ----------------------------------------------------------- */
+  /* Recoverable loss is the one number that drives action, so it gets the most
+     saturated hue in the system. Structural loss is deliberately desaturated:
+     real money, reported honestly, but nothing anyone can act on. */
+  --color-loss: oklch(54.0% 0.205 27);
+  --color-loss-bright: oklch(64.0% 0.215 27);
+  --color-recovered: oklch(54.0% 0.140 160);
+  --color-recovered-bright: oklch(66.0% 0.160 160);
+  --color-structural: oklch(58.0% 0.011 72);
+
+  /* ---- Brand: light orange ------------------------------------------- */
+  /* A soft apricot carries the identity. Like any light brand colour it is a
+     *fill*, never a text colour — at 84% lightness it fails contrast as text
+     on white — so it travels with two companions:
+       --color-brand       fills — the active nav pill, primary buttons, bars
+       --color-brand-ink   text placed ON an orange fill (dark brown, ~9:1)
+       --color-brand-deep  orange-family text on a white surface (~5:1) */
+  --color-brand: oklch(83.5% 0.115 62);
+  --color-brand-bright: oklch(87.0% 0.100 66);
+  --color-brand-soft: oklch(95.2% 0.038 70);
+  --color-brand-dim: oklch(98.0% 0.016 72);
+  --color-brand-ink: oklch(28.0% 0.060 45);
+  --color-brand-deep: oklch(53.0% 0.165 45);
+
+  /* ---- Accent ---------------------------------------------------------- */
+  /* Aliased onto the readable end of the brand family, because `accent` is
+     used for text, strokes and focus rings across the app. */
+  --color-accent: var(--color-brand-deep);
+  --color-accent-bright: oklch(62.0% 0.170 50);
+  --color-accent-dim: var(--color-brand-dim);
+  --color-accent-soft: var(--color-brand-soft);
+  --color-warn: oklch(64.0% 0.150 70);
+  --color-warn-dim: oklch(95.5% 0.055 80);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-numeric: var(--font-mono-numeric), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* The reference language is soft and rounded: cards read as tiles, not
+     as panels with corners. */
+  --radius-card: 1.25rem;
+  --radius-tile: 1.5rem;
+  --radius-rail: 1.75rem;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Semantic tokens                                                         */
+/* ---------------------------------------------------------------------- */
+
+:root {
+  /* A white canvas. White cards on white separate by border and shadow
+     alone, so both are warmed slightly toward the brand hue rather than left
+     as neutral grey, which reads cold next to orange. */
+  --bg: oklch(100% 0 0);
+  --bg-grad: none;
+
+  /* The sidebar and feature cards: a pale peach panel with dark text. The
+     `.rail` utility below re-scopes the semantic tokens to these, so a chart
+     inside a feature card picks up the panel's grid and ticks by itself. */
+  --rail: oklch(97.2% 0.022 70);
+  --rail-2: oklch(94.5% 0.040 68);
+  --rail-inset: oklch(93.5% 0.040 68);
+  --rail-text: var(--color-ink-950);
+  --rail-text-2: var(--color-ink-600);
+  --rail-border: oklch(91.0% 0.035 68);
+  --rail-border-strong: oklch(84.0% 0.050 66);
+
+  --surface: oklch(100% 0 0);
+  --surface-2: oklch(97.4% 0.008 70);
+  --surface-3: oklch(95.0% 0.012 70);
+  --surface-inset: oklch(95.5% 0.010 70);
+
+  --border: oklch(91.5% 0.010 70);
+  --border-strong: oklch(85.0% 0.014 68);
+
+  --text: var(--color-ink-950);
+  --text-2: var(--color-ink-600);
+  --text-3: var(--color-ink-500);
+
+  /* Layered elevation. Two shadows per level — a tight contact shadow and a
+     soft ambient one — which is what separates a card that looks lifted from
+     one that looks outlined. */
+  --shadow-1: 0 1px 2px oklch(20% 0.01 70 / 0.05), 0 1px 3px oklch(20% 0.01 70 / 0.04);
+  --shadow-2: 0 1px 2px oklch(20% 0.01 70 / 0.05), 0 4px 12px oklch(20% 0.01 70 / 0.06);
+  --shadow-3: 0 2px 4px oklch(20% 0.01 70 / 0.05), 0 12px 28px oklch(20% 0.01 70 / 0.09);
+  --shadow-4: 0 4px 8px oklch(20% 0.01 70 / 0.06), 0 24px 56px oklch(20% 0.01 70 / 0.13);
+  /* A hairline of light along the top edge. Cheap, and it is most of what
+     makes a surface read as physical rather than flat. */
+  --highlight: inset 0 1px 0 oklch(100% 0 0 / 0.9);
+
+  color-scheme: light;
+}
+
+/* The brief is a white background, so the OS colour scheme does not switch
+   the page dark on its own. A dark theme stays available behind an explicit
+   `data-theme="dark"` on <html>, for a future toggle. */
+:root[data-theme="dark"] {
+  --bg: var(--color-ink-1000);
+  --bg-grad: none;
+  --rail: oklch(21.0% 0.014 60);
+  --rail-2: oklch(26.5% 0.020 58);
+  --rail-inset: oklch(17.0% 0.012 60);
+  --rail-text: var(--color-ink-50);
+  --rail-text-2: var(--color-ink-300);
+  --rail-border: oklch(30.0% 0.020 58);
+  --rail-border-strong: oklch(38.0% 0.024 58);
+  --surface: var(--color-ink-900);
+  --surface-2: var(--color-ink-850);
+  --surface-3: var(--color-ink-800);
+  --surface-inset: var(--color-ink-950);
+  --border: oklch(30% 0.010 66);
+  --border-strong: oklch(38% 0.012 66);
+  --text: var(--color-ink-50);
+  --text-2: var(--color-ink-300);
+  --text-3: var(--color-ink-400);
+  --color-loss: var(--color-loss-bright);
+  --color-recovered: var(--color-recovered-bright);
+  --color-accent: oklch(80.0% 0.120 62);
+  --color-brand-deep: oklch(80.0% 0.120 62);
+  --color-brand-dim: oklch(28.0% 0.050 55);
+  --color-brand-soft: oklch(33.0% 0.070 55);
+  --color-running-dim: oklch(28% 0.060 152);
+  --color-stopped-dim: oklch(28% 0.070 27);
+  --color-accent-dim: oklch(28% 0.050 55);
+  --color-warn-dim: oklch(30% 0.060 80);
+  --shadow-1: 0 1px 2px oklch(0% 0 0 / 0.30);
+  --shadow-2: 0 1px 2px oklch(0% 0 0 / 0.30), 0 4px 12px oklch(0% 0 0 / 0.35);
+  --shadow-3: 0 2px 4px oklch(0% 0 0 / 0.30), 0 12px 28px oklch(0% 0 0 / 0.45);
+  --shadow-4: 0 4px 8px oklch(0% 0 0 / 0.35), 0 24px 56px oklch(0% 0 0 / 0.55);
+  --highlight: inset 0 1px 0 oklch(100% 0 0 / 0.06);
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Base                                                                    */
+/* ---------------------------------------------------------------------- */
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 22%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* A restrained scrollbar. The default one on Linux/Windows is the single
+   loudest piece of chrome on an otherwise quiet page. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; }
+
+/* ---------------------------------------------------------------------- */
+/* Utilities                                                               */
+/* ---------------------------------------------------------------------- */
+
+@layer utilities {
+  .text-2 { color: var(--text-2); }
+  .text-3 { color: var(--text-3); }
+
+  .surface   { background: var(--surface); }
+  .surface-2 { background: var(--surface-2); }
+  .surface-3 { background: var(--surface-3); }
+  .surface-inset { background: var(--surface-inset); }
+
+  /* The sidebar and the feature cards. A panel re-points the semantic
+     tokens at its own palette, so anything dropped inside it — a chart's
+     axis ticks and grid, a bordered row, muted body copy — adapts without the
+     caller passing colours down. It sets its own text colour for the same
+     reason: a panel is a different surface, and inheriting from the page is
+     how its contents break when the page palette changes. */
+  .rail, .rail-2 {
+    --surface: var(--rail);
+    --surface-2: var(--rail-2);
+    --surface-3: var(--rail-2);
+    --surface-inset: var(--rail-inset);
+    --border: var(--rail-border);
+    --border-strong: var(--rail-border-strong);
+    --text: var(--rail-text);
+    --text-2: var(--rail-text-2);
+    --text-3: var(--rail-text-2);
+  }
+  .rail   { background: var(--rail);   color: var(--rail-text); }
+  .rail-2 { background: var(--rail-2); color: var(--rail-text); }
+  .text-rail-2 { color: var(--rail-text-2); }
+  .border-rail { border-color: var(--rail-border); }
+
+  /* The orange. A fill, with its own ink — see the token comment. */
+  .brand      { background: var(--color-brand); color: var(--color-brand-ink); }
+  .brand-soft { background: var(--color-brand-soft); color: var(--color-brand-ink); }
+  .text-brand { color: var(--color-brand-deep); }
+
+  .elev-1 { box-shadow: var(--shadow-1), var(--highlight); }
+  .elev-2 { box-shadow: var(--shadow-2), var(--highlight); }
+  .elev-3 { box-shadow: var(--shadow-3), var(--highlight); }
+  .elev-4 { box-shadow: var(--shadow-4), var(--highlight); }
+
+  /* Frosted chrome for the sticky header. */
+  .glass {
+    background: color-mix(in oklab, var(--surface) 82%, transparent);
+    backdrop-filter: saturate(180%) blur(16px);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+  }
+
+  /* Money. Tabular, tight, and never anything else — a column of rupee figures
+     has to scan vertically, and a live ticker must not reflow as digits change. */
+  .money {
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    font-feature-settings: "tnum" 1, "zero" 1;
+  }
+
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* Large STATIC figures — the owner's four numbers, the meeting headlines.
+     Proportional digits in the UI sans: equal-width digits make "121" look
+     loose at display sizes, and a second typeface on the hero number reads as
+     decoration.
+
+     `.money` (mono + tabular) stays for anything that moves or aligns: the live
+     ticker, counting animations, table columns and axis ticks, where a digit
+     changing width would make the number jitter. */
+  .figure {
+    font-variant-numeric: proportional-nums;
+    letter-spacing: -0.035em;
+  }
+
+  /* Headings earn negative tracking; small caps labels earn positive. */
+  .display {
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+  }
+  .label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.075em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+
+  /* Touch targets for the capture screens. 56px, not 44px: the user is wearing
+     gloves, next to a running machine, in a hurry. */
+  .touch    { min-height: 3.5rem; }
+  .touch-lg { min-height: 4.5rem; }
+
+  /* Morning Meeting Mode — read from five metres. */
+  .meeting-scale { font-size: clamp(1rem, 0.55vw + 0.86rem, 1.375rem); }
+
+  .hairline {
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      var(--border-strong),
+      transparent
+    );
+    height: 1px;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* State, motion                                                           */
+/* ---------------------------------------------------------------------- */
+
+/* A stopped machine glows. Colour alone is not enough on a sun-washed tablet,
+   and the aura is visible from across an aisle. */
+.state-stopped {
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--color-stopped) 10%, var(--surface)), var(--surface));
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in oklab, var(--color-stopped) 55%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--color-stopped) 18%, transparent),
+    0 8px 30px color-mix(in oklab, var(--color-stopped) 22%, transparent),
+    var(--highlight);
+}
+.state-running {
+  background: var(--surface);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--color-running) 30%, transparent),
+    var(--shadow-2), var(--highlight);
+}
+.state-idle {
+  background: var(--surface);
+  box-shadow: var(--shadow-1), var(--highlight);
+}
+
+/* The status LED. A real pilot lamp has a halo; a flat dot reads as a bullet. */
+.led {
+  position: relative;
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+}
+.led::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.22;
+  animation: led-halo 2.4s ease-in-out infinite;
+}
+@keyframes led-halo {
+  0%, 100% { transform: scale(1); opacity: 0.22; }
+  50%      { transform: scale(1.45); opacity: 0.06; }
+}
+
+/* The live cost ticker: a slow breath, never a flash. It has to say "this is
+   still costing money" without becoming something people tune out. */
+@keyframes ticker-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.68; }
+}
+.ticker-live { animation: ticker-breathe 2.6s ease-in-out infinite; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.rise { animation: rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+.shimmer { position: relative; overflow: hidden; }
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--text) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-live,
+  .led::after,
+  .shimmer::after { animation: none; }
+  .rise { animation: none; opacity: 1; transform: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  body { background: #fff; }
+  .glass { background: #fff; backdrop-filter: none; }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Skill Matrix — an ordinal ramp                                          */
+/* ---------------------------------------------------------------------- */
+
+/* Skill levels are ordered (in training → competent → can train others), so
+   they take one hue, stepped light to dark. Validated with the ordinal checks:
+   monotone lightness, visible step gaps, and a light end that clears the
+   surface.
+
+   The brand's own tints were tried first and failed: "in training" at
+   --color-brand-soft is 1.13:1 against white, which would draw a trainee
+   exactly like somebody with no skill at all — the one distinction the matrix
+   exists to show. Each step also carries its number, so the level is never
+   read from colour alone. */
+:root {
+  --skill-1: #e79f5c;      /* 2.15:1 vs surface · dark ink text 7.5:1 */
+  --skill-2: #d7721b;      /* dark ink text 5.0:1 */
+  --skill-3: #aa3800;      /* white text 6.4:1 */
+  --skill-1-text: #2e1a0c;
+  --skill-2-text: #2e1a0c;
+  --skill-3-text: #ffffff;
+}
+
+/* Dark is selected, not flipped: the ramp runs the other way against a dark
+   surface, and was validated there separately. */
+:root[data-theme="dark"] {
+  --skill-1: #a64b00;      /* 3.0:1 vs surface · white text 5.8:1 */
+  --skill-2: #cf7015;      /* dark ink text 5.2:1 */
+  --skill-3: #eba765;      /* dark ink text 8.9:1 */
+  --skill-1-text: #ffffff;
+  --skill-2-text: #1d130c;
+  --skill-3-text: #1d130c;
+}

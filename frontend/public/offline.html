@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Offline · FactoryManager AI</title>
+    <!-- Served by the service worker when a page was never opened on this
+         tablet and there is no connection. Self-contained: no scripts, no
+         external styles, nothing that needs the network. -->
+    <style>
+      :root { color-scheme: light; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        background: #ffffff;
+        color: #1c1712;
+        font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 32rem; padding: 2rem 1.25rem; text-align: center; }
+      .mark {
+        display: inline-grid;
+        place-items: center;
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: 1rem;
+        background: #b44100;
+        color: #ffffff;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      h1 { font-size: 1.5rem; margin: 1.25rem 0 0.5rem; }
+      p { margin: 0.5rem 0; color: #5a5047; }
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 3.5rem;
+        margin-top: 1.5rem;
+        padding: 0 1.75rem;
+        border-radius: 999px;
+        background: #ffb878;
+        color: #411e0d;
+        font-weight: 600;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="mark" aria-hidden="true">FM</span>
+      <h1>This tablet is offline</h1>
+      <p>
+        Entries already made on the machine grid and quality screens are being kept on this
+        tablet. They will be sent on their own as soon as the connection comes back.
+      </p>
+      <p>This page was not opened here before, so it cannot be shown without a connection.</p>
+      <a href="/floor">Back to the machine grid</a>
+    </main>
+  </body>
+</html>
