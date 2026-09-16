@@ -13,11 +13,13 @@ from . import (
     delivery,
     escalations,
     ingest,
+    maintenance,
     masters,
     onboarding,
     plugins,
     reports,
     shifts,
+    stores,
     sync,
     trace,
 )
@@ -28,6 +30,10 @@ api_router.include_router(masters.router)
 api_router.include_router(shifts.router)
 api_router.include_router(capture.router)
 api_router.include_router(escalations.router)
+# §1's two 'when events occur' roles. Each desk reads Core data the plant is
+# already capturing and writes only the one thing §1 names for that role.
+api_router.include_router(maintenance.router)
+api_router.include_router(stores.router)
 api_router.include_router(delivery.router)
 api_router.include_router(sync.router)
 api_router.include_router(corrections.router)

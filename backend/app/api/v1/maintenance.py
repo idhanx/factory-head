@@ -19,7 +19,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import Identity, get_identity, get_plant, get_session, require
 from app.api.scoping import in_plant
 from app.kernel import format_inr
-from app.models import DowntimeEvent, Plant, Role, Station, User
+from app.models import (
+    DowntimeEvent,
+    DowntimeStatus,
+    Plant,
+    ReasonCode,
+    Role,
+    ShiftSession,
+    ShiftSessionStatus,
+    Station,
+)
 from app.schemas import (
     ClosedBreakdownOut,
     MaintenanceDeskOut,
@@ -42,7 +51,14 @@ async def desk(
     plant: Plant = Depends(get_plant),
     session: AsyncSession = Depends(get_session),
 ):
-    """Alerts, live stops and unwritten repairs — ranked by rupees, not by time."""
+    """Alerts, live stops and unwritten repairs — ranked by rupees, not by time.
+
+    The two lists split on the reason code's escalation route, the same rule
+    §3 Layer 2 uses to pick who gets the 15-minute WhatsApp: ``open_breakdowns``
+    is what this plant has tagged as maintenance's, ``other_open_stops`` is the
+    rest of the floor, kept visible because a fitter walking past a line that is
+    down for material should know it, and blank because it is not theirs.
+    """
     alerts = await escalation_service.open_for_route(session, plant.id, route="maintenance")
 
     stops = await service.open_stops(session, plant.id)
@@ -50,21 +66,21 @@ async def desk(
         session, {stop.event.repaired_by_id for stop in stops}
     )
 
-    breakdowns = [
-        _stop_out(stop, repairers) for stop in stops if stop.reason and stop.reason.is_breakdown
-    ]
-    others = [
-        _stop_out(stop, repairers)
-        for stop in stops
-        if not (stop.reason and stop.reason.is_breakdown)
-    ]
+    def is_mine(stop: service.OpenStop) -> bool:
+        return bool(stop.reason and stop.reason.escalation_route.value == "maintenance")
+
+    mine = [_stop_out(stop, repairers) for stop in stops if is_mine(stop)]
+    others = [_stop_out(stop, repairers) for stop in stops if not is_mine(stop)]
 
     outstanding = await service.repairs_outstanding(session, plant)
-    open_cost = sum(stop.cost_paise for stop in stops)
+    # The headline is what maintenance's own open stops are costing. Summing
+    # the whole floor here would put material waits on their number and make
+    # the one figure on their screen unownable.
+    open_cost = sum(stop.cost_paise for stop in stops if is_mine(stop))
 
     return MaintenanceDeskOut(
         alerts=alerts,
-        open_breakdowns=breakdowns,
+        open_breakdowns=mine,
         other_open_stops=others,
         awaiting_repair_note=[
             ClosedBreakdownOut(
@@ -156,8 +172,6 @@ async def log_repair(
 
 
 async def _reject_if_locked(session: AsyncSession, event: DowntimeEvent) -> None:
-    from app.models import ShiftSession, ShiftSessionStatus
-
     if event.shift_session_id is None:
         return
     shift_session = await session.get(ShiftSession, event.shift_session_id)
@@ -189,6 +203,3 @@ def _stop_out(stop: service.OpenStop, repairers: dict[uuid.UUID, str]) -> OpenSt
         repaired_at=event.repaired_at,
         escalation_level=event.escalation_level,
     )
-
-
-__all__ = ["router", "User"]

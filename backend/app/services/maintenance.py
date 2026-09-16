@@ -16,11 +16,22 @@ So this desk is one ranked list, not a report:
 * the escalations routed to *maintenance* that nobody has answered (§3 Layer 2,
   the 15-minute rung), most expensive first — read through
   ``services.escalations``, which the stores desk shares;
-* every open breakdown, with its live cost, whether or not a rung has fired
-  yet — a machine that stopped four minutes ago is still their machine;
-* the breakdowns closed recently that nobody has written a repair note against,
+* every open stop *routed to maintenance*, with its live cost, whether or not a
+  rung has fired yet — a machine that stopped four minutes ago is still theirs;
+* the stops closed recently that nobody has written a repair note against,
   because §1's second duty is the one that feeds Factory Memory and it is the
   one that silently gets skipped.
+
+**What counts as "theirs" is the reason code's escalation route, not the
+``is_breakdown`` flag.** §8.1 reserves that flag for MTBF/MTTR and says so
+explicitly — "'Machine Breakdown' code only" — and the default library (§16.4)
+sets it on exactly one of the eighteen codes. Six of them route to maintenance:
+tool breakage, machine breakdown, fixture, coolant, planned maintenance, power
+cut. Filtering this desk on ``is_breakdown`` would therefore hide five of the
+six, including the tool breakage §6's own 5:45 AM briefing assigns to Suresh K.
+in Maintenance. The route is the plant's own answer to "whose problem is this",
+already tuned during onboarding, and it is the rule §3 Layer 2 uses to pick who
+gets the 15-minute WhatsApp — so the desk and the ladder agree by construction.
 
 Everything here is read off Core data already being captured. The only thing
 this role ever writes is the repair note, which is §1's own instruction.
@@ -42,6 +53,7 @@ from app.models import (
     DowntimeStatus,
     Plant,
     ReasonCode,
+    Recoverability,
     Station,
     User,
 )
@@ -96,18 +108,18 @@ async def open_stops(
     session: AsyncSession,
     plant_id: uuid.UUID,
     *,
-    breakdowns_only: bool = False,
+    route: str | None = None,
     now: datetime | None = None,
 ) -> list[OpenStop]:
     """Every machine currently stopped, dearest first.
 
-    ``breakdowns_only`` narrows to reason codes flagged ``is_breakdown`` — the
-    same flag MTBF/MTTR use, so maintenance's list and maintenance's KPIs can
-    never disagree about what counts as a breakdown (§8.1).
+    ``route`` narrows to the stops one role owns, by the reason code's own
+    escalation route — see the module docstring for why that, and not
+    ``is_breakdown``, is the rule.
     """
     query = _open_stops_query(plant_id)
-    if breakdowns_only:
-        query = query.where(ReasonCode.is_breakdown.is_(True))
+    if route is not None:
+        query = query.where(ReasonCode.escalation_route == route)
 
     stops: list[OpenStop] = []
     for event, station, reason in (await session.execute(query)).all():
@@ -123,14 +135,21 @@ async def repairs_outstanding(
     session: AsyncSession,
     plant: Plant,
     *,
+    route: str = "maintenance",
     days: int = REPAIR_BACKLOG_DAYS,
     now: datetime | None = None,
 ) -> list[tuple[DowntimeEvent, Station, ReasonCode | None]]:
-    """Breakdowns that ended without anyone writing down what fixed them.
+    """Stops that ended without anyone writing down what fixed them.
 
     §1's second duty, made visible. A closed breakdown with no repair note is
     knowledge that left the plant with whoever fixed it — exactly the loss
     Factory Memory exists to prevent (§3 Layer 4).
+
+    Narrowed to *recoverable* stops. A power cut and a planned maintenance
+    window both route to maintenance, but §5's own definition of recoverable is
+    "the plant's own process failure — fixable", and asking a fitter what fixed
+    last Tuesday's power cut is how a list earns itself a reputation for
+    nonsense and stops being opened (§12, risk 10 — action fatigue).
     """
     since = (now or datetime.now(UTC)) - timedelta(days=days)
     rows = (
@@ -142,7 +161,8 @@ async def repairs_outstanding(
                 DowntimeEvent.plant_id == plant.id,
                 DowntimeEvent.status == DowntimeStatus.CLOSED,
                 DowntimeEvent.ended_at >= since,
-                ReasonCode.is_breakdown.is_(True),
+                ReasonCode.escalation_route == route,
+                ReasonCode.recoverability == Recoverability.RECOVERABLE,
                 DowntimeEvent.repair_note.is_(None),
             )
             .order_by(DowntimeEvent.cost_total.desc())
