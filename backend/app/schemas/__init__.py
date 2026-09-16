@@ -430,6 +430,11 @@ class EscalationOut(BaseModel):
     level: int
     status: str
     channel: str
+    #: The role this rung was aimed at — maintenance | stores | quality |
+    #: production | plant_head | supervisor. §3 Layer 2: "the system picks the
+    #: recipient from the reason code". Stored on the row, so an inbox can tell
+    #: a breakdown from a material wait without re-deriving the routing.
+    route: str | None = None
     downtime_event_id: uuid.UUID
     station_code: str | None
     message: str | None
@@ -1037,3 +1042,115 @@ class DispatchRequest(BaseModel):
     quantity: int = Field(gt=0, le=10_000_000)
     #: §14.2 — "vehicle/challan reference (one field)".
     vehicle_reference: str | None = Field(default=None, max_length=128)
+
+
+# ---------------------------------------------------------------------------
+# The role desks (§1, "Who uses it") — Maintenance and Stores
+# ---------------------------------------------------------------------------
+#
+# §1 gives these two roles a cadence of "when events occur", not "daily". Each
+# desk therefore answers one question — what is mine, right now, and what is it
+# costing — and offers exactly the one write §1 names for that role. Every
+# number below comes from Core data already captured; neither desk adds a
+# register, and neither spends any of §4.3's 15-minute budget.
+
+
+class OpenStopOut(BaseModel):
+    """A machine that is stopped now, with its live rupee ticker."""
+
+    event_id: uuid.UUID
+    station_id: uuid.UUID
+    station_code: str
+    station_name: str
+    reason_code: str | None
+    reason_label: str | None
+    is_breakdown: bool
+    started_at: datetime
+    minutes: int
+    cost_paise: int
+    cost_display: str
+    note: str | None
+    #: Present once somebody has written up what they did (§1, Maintenance).
+    repair_note: str | None = None
+    repair_part_changed: str | None = None
+    repaired_by_name: str | None = None
+    repaired_at: datetime | None = None
+    escalation_level: int = 0
+
+
+class ClosedBreakdownOut(BaseModel):
+    """A breakdown that ended without a repair note — knowledge about to be lost."""
+
+    event_id: uuid.UUID
+    station_code: str
+    station_name: str
+    reason_label: str | None
+    started_at: datetime
+    ended_at: datetime | None
+    minutes: int
+    cost_paise: int
+    cost_display: str
+
+
+class RepairLogRequest(BaseModel):
+    """§1 — "Logs what was done to fix breakdowns"."""
+
+    note: str = Field(min_length=1, max_length=2000)
+    #: The one structured field worth having: Factory Memory's second capture
+    #: question is "what did you replace or change?" (§3, Layer 4).
+    part_changed: str | None = Field(default=None, max_length=200)
+
+
+class MaintenanceDeskOut(BaseModel):
+    """Everything the maintenance in-charge needs, ranked by money."""
+
+    alerts: list[EscalationOut]
+    open_breakdowns: list[OpenStopOut]
+    other_open_stops: list[OpenStopOut]
+    awaiting_repair_note: list[ClosedBreakdownOut]
+    open_cost_paise: int
+    open_cost_display: str
+
+
+class StagingRowOut(BaseModel):
+    """One job order and Stores' answer about its material for today."""
+
+    job_order_id: uuid.UUID
+    job_number: str
+    part_number: str
+    part_description: str | None
+    customer_name: str | None
+    planned_quantity: int
+    station_codes: list[str]
+    status: Literal["pending", "staged", "short"]
+    quantity_required: int | None = None
+    quantity_staged: int | None = None
+    note: str | None = None
+    confirmed_by_name: str | None = None
+    confirmed_at: datetime | None = None
+    #: What not answering has already cost today, in this plant's own numbers.
+    wait_events: int = 0
+    wait_cost_paise: int = 0
+    wait_cost_display: str = "₹0"
+
+
+class StagingConfirmRequest(BaseModel):
+    """§1 — "Confirms material staging". One tap, plus a number if short."""
+
+    job_order_id: uuid.UUID
+    status: Literal["staged", "short"]
+    #: Required when short; defaults to the job's planned quantity when staged.
+    quantity_staged: int | None = Field(default=None, ge=0)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class StoresDeskOut(BaseModel):
+    """Everything the stores in-charge needs, worst first."""
+
+    business_date: date
+    alerts: list[EscalationOut]
+    open_waits: list[OpenStopOut]
+    queue: list[StagingRowOut]
+    pending_count: int
+    wait_cost_today_paise: int
+    wait_cost_today_display: str

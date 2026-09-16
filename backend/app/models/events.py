@@ -150,6 +150,20 @@ class DowntimeEvent(Base, PlantScopedMixin, TimestampMixin, CostedMixin):
 
     escalation_level: Mapped[int] = mapped_column(Integer, default=0)
 
+    # §1, Maintenance In-charge: "Logs what was done to fix breakdowns."
+    # The reason code says WHAT stopped (§5.5); this says what was actually
+    # done about it, by whom, at the machine, while the memory is fresh — and
+    # it is the raw material Factory Memory answers 'what usually fixes this?'
+    # from. Kept on the event rather than in a table of its own because one
+    # breakdown is one event: a second row could only ever disagree with it.
+    repair_note: Mapped[str | None] = mapped_column(Text)
+    repair_part_changed: Mapped[str | None] = mapped_column(String(200))
+    repaired_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL", name="fk_downtime_repaired_by"),
+    )
+    repaired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
 
 class ProductionCount(Base, PlantScopedMixin, TimestampMixin):
     """Screen 4. Count since last entry, hourly or per batch. 15 seconds.
@@ -321,3 +335,57 @@ class DispatchRecord(Base, PlantScopedMixin, TimestampMixin):
     source: Mapped[DataSource] = mapped_column(
         EnumString(DataSource, 12), default=DataSource.MANUAL
     )
+
+
+class StagingStatus(str, Enum):
+    PENDING = "pending"
+    STAGED = "staged"
+    SHORT = "short"
+
+
+class MaterialStaging(Base, PlantScopedMixin, TimestampMixin):
+    """§1, Stores In-charge: "Confirms material staging."
+
+    §6's 5:45 AM briefing ends its second priority with "confirm with Ramesh in
+    Stores that full quantity is at Line 2 before 8:00" — this is the row that
+    confirmation writes, and the only place the plant can later answer whether
+    the material was actually there before the shift started.
+
+    No row is created for Stores to fill: the queue is today's job orders, and
+    a row appears when someone taps. Confirming is one tap plus a number when
+    it is short, which is why this never spends any of the 15-minute daily
+    entry budget §4.3 protects.
+    """
+
+    __tablename__ = "material_stagings"
+    __table_args__ = (
+        # One standing answer per job order per day. Stores correcting itself
+        # ("it was short, now it is staged") must update that answer, never add
+        # a second one beside it.
+        Index(
+            "uq_material_staging_job_date",
+            "plant_id",
+            "job_order_id",
+            "business_date",
+            unique=True,
+        ),
+        Index("ix_material_staging_date", "plant_id", "business_date", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    job_order_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("job_orders.id", ondelete="CASCADE"), index=True
+    )
+    business_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[StagingStatus] = mapped_column(
+        EnumString(StagingStatus, 12), default=StagingStatus.PENDING, nullable=False
+    )
+    #: What the job needs, frozen when Stores answered — so a later change to
+    #: the job's plan never rewrites what Stores was asked for that morning.
+    quantity_required: Mapped[int | None] = mapped_column(Integer)
+    quantity_staged: Mapped[int | None] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(Text)
+    confirmed_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

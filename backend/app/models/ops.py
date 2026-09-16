@@ -66,6 +66,12 @@ class Escalation(Base, PlantScopedMixin, TimestampMixin):
     status: Mapped[EscalationStatus] = mapped_column(
         EnumString(EscalationStatus, 12), default=EscalationStatus.PENDING, nullable=False
     )
+    # Who the rung was aimed at, as a role — not just as a name. §3 Layer 2:
+    # "the system picks the recipient from the reason code". Storing only the
+    # person means the maintenance in-charge's inbox cannot tell a breakdown
+    # addressed to him from a material wait addressed to Stores, and the
+    # routing that the reason code performed is lost the moment staff change.
+    route: Mapped[str | None] = mapped_column(String(20), index=True)
     recipient_name: Mapped[str | None] = mapped_column(String(200))
     recipient_number: Mapped[str | None] = mapped_column(String(20))
     message: Mapped[str | None] = mapped_column(Text)

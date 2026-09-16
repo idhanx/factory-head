@@ -180,7 +180,8 @@ async def schedule_escalations(
 
     escalations: list[Escalation] = []
     for level, delay in ESCALATION_LADDER:
-        recipient = await _recipient_for(session, plant.id, reason, int(level))
+        route = escalation_route_for(reason, int(level))
+        recipient = await _recipient_for(session, plant.id, route)
         escalations.append(
             Escalation(
                 plant_id=plant.id,
@@ -193,6 +194,11 @@ async def schedule_escalations(
                     if int(level) == 1
                     else EscalationChannel.WHATSAPP
                 ),
+                # The role is stored beside the person. A name answers "who was
+                # told"; the route answers "whose problem is this" — which is
+                # what the maintenance and stores desks filter their inbox on,
+                # and it survives the recipient list being edited next month.
+                route=route,
                 recipient_name=recipient.name if recipient else None,
                 recipient_number=recipient.whatsapp_number if recipient else None,
             )
@@ -235,32 +241,37 @@ async def _settle_escalations(
             row.resolved_at = resolved_at
 
 
-async def _recipient_for(
-    session: AsyncSession,
-    plant_id: uuid.UUID,
-    reason: ReasonCode | None,
-    level: int,
-) -> AlertRecipient | None:
+def escalation_route_for(reason: ReasonCode | None, level: int) -> str:
     """§3 Layer 2 — "the system picks the recipient from the reason code".
 
     A material wait goes to Stores, a breakdown to Maintenance. Nobody chooses
     from a dropdown at 10:40 AM with a line down.
+
+    Level 1 is the push to the supervisor who is already looking at the screen,
+    level 3 is the plant head with the running cost, and level 2 is the rung the
+    reason code actually decides.
     """
     if level == 1:
-        return None  # level 1 is a push to the supervisor already on the screen
-
+        return "supervisor"
     if level >= 3:
-        role_tag = "plant_head"
-    elif reason is not None:
-        role_tag = reason.escalation_route.value
-    else:
-        role_tag = "production"
+        return "plant_head"
+    if reason is not None:
+        return reason.escalation_route.value
+    return "production"
+
+
+async def _recipient_for(
+    session: AsyncSession, plant_id: uuid.UUID, route: str
+) -> AlertRecipient | None:
+    """The person holding that role tag in this plant, if anyone does."""
+    if route == "supervisor":
+        return None  # already on the screen; the push needs no recipient row
 
     return await session.scalar(
         select(AlertRecipient)
         .where(
             AlertRecipient.plant_id == plant_id,
-            AlertRecipient.role_tag == role_tag,
+            AlertRecipient.role_tag == route,
             AlertRecipient.is_active.is_(True),
         )
         .limit(1)
