@@ -124,7 +124,12 @@ async def staging_queue(
     order = {StagingStatus.SHORT: 0, StagingStatus.PENDING: 1, StagingStatus.STAGED: 2}
     queue.sort(
         key=lambda row: (
-            0 if row.wait_cost_paise else 1,
+            # A job that has already stopped a line today comes first, whatever
+            # that stop cost. The bucket is the *count*, not the rupees: a
+            # two-minute wait on a cheap station can round to a very small
+            # number, and a job that has genuinely halted the floor must not
+            # sort below one that has not simply because it was brief.
+            0 if row.wait_events else 1,
             -row.wait_cost_paise,
             order[row.status],
             row.job_order.job_number,

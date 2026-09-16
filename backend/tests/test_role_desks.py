@@ -227,7 +227,13 @@ async def test_the_maintenance_desk_ranks_live_stops_by_rupees_not_by_time(
     assert len(desk["open_breakdowns"]) == 1
     stop = desk["open_breakdowns"][0]
     assert stop["station_code"] == "CNC-3"
-    assert stop["is_breakdown"] is True
+    # It is on this desk because its reason code routes to maintenance — not
+    # because of ``is_breakdown``, which §8.1 reserves for MTBF/MTTR and the
+    # default library sets on 'Machine Breakdown' alone. A tool breakage is
+    # maintenance's work (§6's own Priority 1 assigns one to Suresh K.) while
+    # correctly not counting as a machine breakdown.
+    assert stop["reason_code"] == "TOOL_BREAKAGE"
+    assert stop["is_breakdown"] is False
     assert stop["minutes"] == 47
     # The same kernel the supervisor's grid and the shift report use (§8.1's
     # build rule) — never a second implementation of the cost formula.
@@ -559,11 +565,14 @@ async def test_the_queue_puts_the_job_that_is_already_costing_money_first(
     api, session, fixtures
 ):
     """What a person standing at a stores counter should deal with first."""
-    quiet = await _job(session, fixtures, "9007")
+    await _job(session, fixtures, "9007")  # quiet: no waits against it today
     costing = await _job(session, fixtures, "9008")
     await _start_shift(api, fixtures, costing)
 
     event = await _stop(api, fixtures, "MATERIAL_WAIT")
+    row = await session.get(DowntimeEvent, uuid.UUID(event["id"]))
+    row.started_at = datetime.now(UTC) - timedelta(minutes=31)
+    await session.flush()
     await api["client"].post(
         f"/api/v1/downtime/{event['id']}/close", headers=api["as"]("supervisor"), json={}
     )
