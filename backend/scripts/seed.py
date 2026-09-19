@@ -70,7 +70,7 @@ from app.models import (
 )
 from app.services import actions as action_service
 from app.services.costing import apply_snapshot, resolve_snapshot
-from app.services.downtime import escalation_message
+from app.services.downtime import escalation_message, escalation_route_for
 
 random.seed(20260908)  # deterministic demo data
 
@@ -1497,12 +1497,11 @@ async def _backfill_escalations(session, plant) -> int:
             if Decimal(delay.total_seconds() / 60) >= (event.duration_minutes or 0):
                 break
 
-            if int(level) == 1:
-                recipient = None
-            elif int(level) >= 3:
-                recipient = recipients.get("plant_head")
-            else:
-                recipient = recipients.get(reason.escalation_route.value)
+            # The same rule the live ladder applies, imported rather than
+            # restated: a seed that routes differently from production would
+            # quietly invalidate every demo of the maintenance and stores desks.
+            route = escalation_route_for(reason, int(level))
+            recipient = None if route == "supervisor" else recipients.get(route)
 
             fired_at = event.started_at + delay
             elapsed = Decimal(delay.total_seconds()) / Decimal(60)
@@ -1527,6 +1526,7 @@ async def _backfill_escalations(session, plant) -> int:
                         else EscalationChannel.WHATSAPP
                     ),
                     status=EscalationStatus.SENT,
+                    route=route,
                     recipient_name=recipient.name if recipient else None,
                     recipient_number=recipient.whatsapp_number if recipient else None,
                     cost_at_send=cost_at_send,

@@ -16,7 +16,13 @@ for you, or:
 | Owner | `owner@kumaranauto.in` | `owner1234` | Money screen |
 | Supervisor | `+919000000011` | `shift1234` | Machine grid |
 | Quality | `+919000000012` | `quality1234` | Quality entry |
-| Maintenance | `+919000000013` | `maint1234` | Actions board |
+| Maintenance | `+919000000013` | `maint1234` | Maintenance desk |
+| Stores | `+919000000014` | `stores1234` | Stores desk |
+
+Each role lands on the screen §1 says it opens the app for. Maintenance and
+Stores are the two whose cadence §1 gives as *"when events occur"*, so their
+home is the desk showing what is happening now — the alerts routed to them, and
+the one thing §1 says each of them writes.
 
 ---
 
@@ -193,6 +199,50 @@ LLM_BASE_URL=http://localhost:8000/v1
 LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 ```
 
+### Ollama — the Kaizen plugin's AI, on the plant's own machine
+
+Kaizen uses a **local Ollama** rather than the shared vLLM tier, for a reason
+that is not about cost: Step 2 sends a photograph of somebody's shop floor and
+Step 1 sends an operator's voice describing what is wrong with it. Keeping both
+inside the plant is the difference between a product a Plant Head switches on
+and one their customer's IT department will not allow.
+
+Three capabilities, three models, all optional:
+
+```bash
+ollama pull qwen2.5:7b-instruct   # the interview, the challenge, the rewrite
+ollama pull qwen2.5vl:7b          # Step 2 — reading the photo
+ollama pull nomic-embed-text      # pattern-detection fingerprints
+
+# backend/.env
+OLLAMA_ENABLED=true
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_MODEL=qwen2.5:7b-instruct
+OLLAMA_VISION_MODEL=qwen2.5vl:7b
+OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+```
+
+Any OpenAI-compatible endpoint works here, so `OLLAMA_BASE_URL` can be pointed
+at the vLLM tier instead if a plant would rather run one serving process.
+
+**Nothing in the operator journey blocks on a model being up.** With Ollama off
+or unreachable:
+
+| Step | What happens instead |
+| --- | --- |
+| 1 Voice | The browser transcribes on the device; the text is used as spoken |
+| 2 Photo | Stored as evidence, not read — the operator is told so plainly |
+| 3 Category | Keyword classification, which the operator confirms either way |
+| 4 Interview | Unchanged — the question trees are code, not a model |
+| 5A History | Unchanged — Core's event log, no model involved |
+| 6 Money | Unchanged — Core's formula module, no model involved |
+| 7 Challenge | No alternative is offered, rather than a made-up one |
+| 10 Patterns | Clusters on token overlap instead of embeddings |
+
+The money is never model-generated. Savings come from Core's formula module and
+a wrong rupee figure is the one thing that ends credibility with a Plant Head —
+so the model rephrases and classifies, and never does arithmetic.
+
 ### MQTT / EMQX — the sensor seam
 
 Nothing publishes to it yet; it exists so the hardware phase is a data-source
@@ -294,3 +344,22 @@ docker exec -i fm-db pg_restore -U factorymanager -d iea_restore --no-owner < ba
 | `password authentication failed for user "fm_app"` | `APP_DB_PASSWORD` and the password in `DATABASE_URL` differ; re-run `alembic upgrade head` or `ALTER ROLE fm_app PASSWORD '…'` |
 | Coach says "not enough history" | Correct behaviour below ~10 closed shifts — reseed to get 6 weeks |
 | `docker compose` fails pulling images | No Docker Hub access; use Option B |
+
+
+---
+
+## A build quirk worth knowing
+
+`npm run build` reuses the `.next` cache and intermittently fails collecting
+page data for a route that is perfectly fine:
+
+```
+[Error [PageNotFoundError]: Cannot find module for page: /skills]
+```
+
+The route named varies and is unrelated to what changed. Clear the cache and
+build again:
+
+```bash
+rm -rf frontend/.next && npm run build
+```

@@ -21,8 +21,6 @@ from app.models import (
     AuditPack,
     ClauseStatus,
     ComplianceClause,
-    KaizenIdea,
-    KaizenStatus,
     Operator,
     Plant,
     Role,
@@ -34,15 +32,11 @@ from app.schemas import (
     AuditPackOut,
     ClauseOut,
     ComplianceOverview,
-    KaizenDecision,
-    KaizenIdeaOut,
-    KaizenSubmission,
     SkillMatrixOut,
     SkillUpdate,
     TrainingNeedOut,
 )
 from app.services import compliance as compliance_service
-from app.services import kaizen as kaizen_service
 from app.services import skills as skills_service
 
 router = APIRouter(prefix="/plugins", tags=["plugins"])
@@ -178,111 +172,9 @@ async def generate_pack(
     )
 
 
-# ===========================================================================
-# Kaizen AI
-# ===========================================================================
-
-
-@router.get("/kaizen", response_model=list[KaizenIdeaOut])
-async def list_ideas(
-    status_filter: str | None = None,
-    identity: Identity = Depends(get_identity),
-    session: AsyncSession = Depends(get_session),
-):
-    query = select(KaizenIdea).where(KaizenIdea.plant_id == identity.plant_id)
-    if status_filter:
-        try:
-            wanted = KaizenStatus(status_filter)
-        except ValueError:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown status {status_filter!r}"
-            ) from None
-        query = query.where(KaizenIdea.status == wanted)
-    rows = (
-        await session.scalars(
-            query.order_by(KaizenIdea.estimated_annual_saving.desc()).limit(200)
-        )
-    ).all()
-    return [await _kaizen_out(session, idea) for idea in rows]
-
-
-@router.post("/kaizen", response_model=KaizenIdeaOut)
-async def submit_idea(
-    payload: KaizenSubmission,
-    identity: Identity = Depends(get_identity),
-    plant: Plant = Depends(get_plant),
-    session: AsyncSession = Depends(get_session),
-):
-    """Submit an idea and get it scored immediately.
-
-    Anyone in the plant can submit. §5.2's third Action trigger is "anyone can
-    raise an Action from any observation — this is also where Kaizen ideas
-    enter", so the door is deliberately wide.
-    """
-    await in_plant(session, Station, payload.station_id, plant.id, "Station")
-    await in_plant(session, Operator, payload.operator_id, plant.id, "Operator")
-    idea = await kaizen_service.submit(
-        session,
-        plant=plant,
-        title=payload.title,
-        description=payload.description,
-        submitted_by_name=payload.submitted_by_name or identity.display_name,
-        station_id=payload.station_id,
-        operator_id=payload.operator_id,
-    )
-    return await _kaizen_out(session, idea)
-
-
-@router.post(
-    "/kaizen/{idea_id}/decide",
-    response_model=KaizenIdeaOut,
-    dependencies=[Depends(require(Role.OWNER, Role.SUPERVISOR, Role.CONSULTANT))],
-)
-async def decide_idea(
-    idea_id: uuid.UUID,
-    payload: KaizenDecision,
-    plant: Plant = Depends(get_plant),
-    session: AsyncSession = Depends(get_session),
-):
-    """Accept an idea into the Actions engine, or decline it with a reason."""
-    idea = await session.get(KaizenIdea, idea_id)
-    if idea is None or idea.plant_id != plant.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Idea not found")
-    if idea.decided_at is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Already decided")
-
-    if payload.accept:
-        await kaizen_service.accept(
-            session,
-            plant=plant,
-            idea=idea,
-            owner_name=payload.owner_name,
-            due_date=payload.due_date,
-            note=payload.note,
-        )
-    else:
-        if not payload.note:
-            # An idea that disappears without an answer kills the scheme.
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                "Declining an idea needs a reason the operator can read.",
-            )
-        await kaizen_service.reject(session, idea=idea, note=payload.note)
-
-    return await _kaizen_out(session, idea)
-
-
-@router.get("/kaizen/leaderboard")
-async def kaizen_leaderboard(
-    plant: Plant = Depends(get_plant),
-    session: AsyncSession = Depends(get_session),
-):
-    rows = await kaizen_service.leaderboard(session, plant=plant)
-    for row in rows:
-        row["estimated_annual_saving_display"] = format_inr(
-            row["estimated_annual_saving_paise"]
-        )
-    return rows
+# Kaizen AI has its own module: the plugin edition carries a whole operator
+# journey, the Core History Check, an approval workflow and a points ledger.
+# See ``app.api.v1.kaizen`` — same ``/plugins/kaizen`` prefix.
 
 
 # ===========================================================================
@@ -423,25 +315,4 @@ def _clause_out(clause: ComplianceClause) -> ClauseOut:
         last_evidence_at=clause.last_evidence_at,
         gap_note=clause.gap_note,
         also_satisfies=list(clause.also_satisfies or []),
-    )
-
-
-async def _kaizen_out(session: AsyncSession, idea: KaizenIdea) -> KaizenIdeaOut:
-    station = await session.get(Station, idea.station_id) if idea.station_id else None
-    return KaizenIdeaOut(
-        id=idea.id,
-        reference=idea.reference,
-        title=idea.title,
-        description=idea.description,
-        submitted_by_name=idea.submitted_by_name,
-        station_code=station.code if station else None,
-        status=idea.status.value,
-        estimated_annual_saving_paise=idea.estimated_annual_saving,
-        estimated_annual_saving_display=format_inr(idea.estimated_annual_saving),
-        impact_score=idea.impact_score,
-        effort_score=idea.effort_score,
-        score_rationale=idea.score_rationale,
-        action_id=idea.action_id,
-        decision_note=idea.decision_note,
-        created_at=idea.created_at,
     )

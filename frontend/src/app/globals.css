@@ -85,7 +85,12 @@
   --color-warn: oklch(64.0% 0.150 70);
   --color-warn-dim: oklch(95.5% 0.055 80);
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Inter first, then the two Indic faces. A browser walks the stack per
+     character, so an English machine code inside a Tamil sentence still
+     renders in Inter and only the Tamil falls through to Noto. */
+  --font-sans:
+    var(--font-inter), var(--font-tamil), var(--font-devanagari), ui-sans-serif,
+    system-ui, -apple-system, sans-serif;
   --font-numeric: var(--font-mono-numeric), ui-monospace, "SF Mono", Menlo, monospace;
 
   /* The reference language is soft and rounded: cards read as tiles, not

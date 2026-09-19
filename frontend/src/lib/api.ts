@@ -8,8 +8,12 @@ import type {
   AdminUser, CostRate, CostRateInput, Escalation, JobOrderCreate, JobOrderUpdate,
   MasterResource, MasterShapes, PlantCreate, PlantSettings, PlantSettingsUpdate,
   UploadConfirmResult, UploadPreview, UserCreate, UserUpdate,
-  AuditPack, ComplianceOverview, KaizenContributor, KaizenIdea, SkillMatrix, TrainingNeed,
+  AuditPack, ComplianceOverview, SkillMatrix, TrainingNeed,
+  KaizenAnswer, KaizenBoardRow, KaizenClassification, KaizenContext, KaizenDashboard,
+  KaizenIdea, KaizenParticipation, KaizenPattern, KaizenPreview, KaizenSettings,
+  KaizenStanding, KaizenSubmission, VisionFinding,
   LotFlow, LotSearchResult, LotTrace, WipLot,
+  MaintenanceDesk, OpenStop, StagingRow, StagingStatus, StoresDesk,
   ExecutiveKpis, MaintenanceKpis, MonthlyReport, QualityKpis, SupervisorKpis,
   Attachment, AuditEntityType, AuditEntry, DowntimeCorrection, HoldStatus, NotificationChannels,
   NotificationLog, OnboardingDefaults, PushPublicKey, QualityCorrection, ShiftEntries,
@@ -223,9 +227,33 @@ export const api = {
   createPlant: (payload: PlantCreate) => post<PlantSettings>("/admin/plants", payload),
 
   // --- escalations ---------------------------------------------------------
-  escalations: (open?: boolean) =>
-    get<Escalation[]>(`/escalations${open === undefined ? "" : `?open=${open}`}`),
+  escalations: (open?: boolean, mine?: boolean) => {
+    const query = new URLSearchParams();
+    if (open !== undefined) query.set("open", String(open));
+    // §3 Layer 2 routes each rung by the reason code; `mine` reads that route
+    // back, so maintenance is not made to scroll past Stores' material waits.
+    if (mine) query.set("mine", "true");
+    const suffix = query.toString();
+    return get<Escalation[]>(`/escalations${suffix ? `?${suffix}` : ""}`);
+  },
   acknowledgeEscalation: (id: string) => post<Escalation>(`/escalations/${id}/acknowledge`),
+
+  // --- the role desks (§1) --------------------------------------------------
+  maintenanceDesk: () => get<MaintenanceDesk>("/maintenance/desk"),
+  logRepair: (eventId: string, note: string, partChanged?: string) =>
+    post<OpenStop>(`/maintenance/breakdowns/${eventId}/repair`, {
+      note,
+      part_changed: partChanged || null,
+    }),
+
+  storesDesk: (businessDate?: string) =>
+    get<StoresDesk>(`/stores/desk${businessDate ? `?business_date=${businessDate}` : ""}`),
+  confirmStaging: (payload: {
+    job_order_id: string;
+    status: Exclude<StagingStatus, "pending">;
+    quantity_staged?: number | null;
+    note?: string | null;
+  }) => post<StagingRow>("/stores/staging", payload),
 
   // --- shift --------------------------------------------------------------
   currentShift: () => get<ShiftSession | null>("/shifts/current"),
@@ -392,18 +420,105 @@ export const api = {
       `/plugins/compliance/pack?standard=${standard}&period_start=${start}&period_end=${end}`,
     ),
 
-  kaizenIdeas: () => get<KaizenIdea[]>("/plugins/kaizen"),
-  submitKaizen: (payload: {
+  // --- Kaizen AI, Plugin Edition ---------------------------------------
+  // Steps 1-4 are stateless: the phone collects, the server classifies and
+  // prices, and nothing is written until the operator taps submit.
+  kaizenContext: (stationId?: string | null) =>
+    get<KaizenContext>(
+      `/plugins/kaizen/context${stationId ? `?station_id=${stationId}` : ""}`,
+    ),
+  kaizenTranscript: (text: string, language?: string) =>
+    post<{ text: string; original: string; cleaned: boolean }>(
+      "/plugins/kaizen/transcript",
+      { text, language },
+    ),
+  kaizenVision: (file: Blob, said?: string) => {
+    const body = new FormData();
+    body.append("file", file, "photo.jpg");
+    if (said) body.append("said", said);
+    return request<{
+      findings: VisionFinding[];
+      ran: boolean;
+      note: string | null;
+      attachment_id: string | null;
+    }>("/plugins/kaizen/vision", { method: "POST", body });
+  },
+  kaizenClassify: (payload: {
     title: string;
     description: string;
-    submitted_by_name?: string;
     station_id?: string | null;
-  }) => post<KaizenIdea>("/plugins/kaizen", payload),
+    vision_findings?: VisionFinding[];
+  }) => post<KaizenClassification>("/plugins/kaizen/classify", payload),
+  kaizenPreview: (payload: KaizenSubmission) =>
+    post<KaizenPreview>("/plugins/kaizen/preview", payload),
+
+  kaizenIdeas: (params: { status?: string; track?: string; safety?: boolean } = {}) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set("status", params.status);
+    if (params.track) query.set("track", params.track);
+    if (params.safety !== undefined) query.set("safety", String(params.safety));
+    const suffix = query.toString();
+    return get<KaizenIdea[]>(`/plugins/kaizen${suffix ? `?${suffix}` : ""}`);
+  },
+  kaizenIdea: (id: string) => get<KaizenIdea>(`/plugins/kaizen/${id}`),
+  myKaizens: () => get<KaizenIdea[]>("/plugins/kaizen/mine"),
+  myKaizenStanding: () => get<KaizenStanding>("/plugins/kaizen/me"),
+  submitKaizen: (payload: KaizenSubmission) => post<KaizenIdea>("/plugins/kaizen", payload),
   decideKaizen: (
     id: string,
-    payload: { accept: boolean; note?: string; owner_name?: string; due_date?: string },
+    payload: {
+      accept: boolean;
+      note?: string;
+      owner_name?: string;
+      due_date?: string;
+      investment_paise?: number;
+    },
   ) => post<KaizenIdea>(`/plugins/kaizen/${id}/decide`, payload),
-  kaizenLeaderboard: () => get<KaizenContributor[]>("/plugins/kaizen/leaderboard"),
+  promoteKaizen: (
+    id: string,
+    payload: {
+      interview?: KaizenAnswer[];
+      investment_paise?: number;
+      needs_shutdown?: boolean;
+      proposed_fix?: string;
+    },
+  ) => post<KaizenIdea>(`/plugins/kaizen/${id}/promote`, payload),
+  resolveKaizenChallenge: (
+    id: string,
+    payload: { chosen: "mine" | "alternative" | "both"; dismissed_reason?: string },
+  ) => post<KaizenIdea>(`/plugins/kaizen/${id}/challenge`, payload),
+  supplyKaizenRate: (
+    id: string,
+    payload: { key: string; paise: number; effective_from?: string },
+  ) => post<KaizenIdea>(`/plugins/kaizen/${id}/rate`, payload),
+
+  kaizenDashboard: () => get<KaizenDashboard>("/plugins/kaizen/dashboard"),
+  kaizenLeaderboard: () =>
+    get<Record<string, KaizenBoardRow[]>>("/plugins/kaizen/leaderboard"),
+  kaizenParticipation: () =>
+    get<{ departments: KaizenParticipation[]; spikes: Array<Record<string, unknown>> }>(
+      "/plugins/kaizen/participation",
+    ),
+  kaizenNudgeList: () =>
+    get<Array<{ operator_id: string; name: string; department: string | null; days_left: number }>>(
+      "/plugins/kaizen/nudge-list",
+    ),
+  kaizenDigest: () =>
+    get<{ block: Record<string, unknown>; rendered: string }>("/plugins/kaizen/digest"),
+  kaizenPatterns: () => get<KaizenPattern[]>("/plugins/kaizen/patterns"),
+  refreshKaizenPatterns: () => post<KaizenPattern[]>("/plugins/kaizen/patterns/refresh"),
+  createKaizenProject: (
+    id: string,
+    payload: { owner_name?: string; due_date?: string; estimated_cost_paise?: number },
+  ) => post<{ action_id: string; reference: string }>(
+    `/plugins/kaizen/patterns/${id}/project`,
+    payload,
+  ),
+  dismissKaizenPattern: (id: string) =>
+    post<{ dismissed: boolean }>(`/plugins/kaizen/patterns/${id}/dismiss`),
+  kaizenSettings: () => get<KaizenSettings>("/plugins/kaizen/settings"),
+  updateKaizenSettings: (payload: Partial<KaizenSettings>) =>
+    put<KaizenSettings>("/plugins/kaizen/settings", payload),
 
   skillMatrix: () => get<SkillMatrix>("/plugins/skills/matrix"),
   setSkill: (payload: { operator_id: string; station_id: string; level: number }) =>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Lock, LockOpen, ShieldAlert, Timer } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatMinutes } from "@/lib/format";
+import { formatMinutes, activeLocale } from "@/lib/format";
 import { Money } from "@/components/ui/money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Label, Textarea } from "@/components/ui/input";
 import { ErrorNote, Skeleton } from "@/components/ui/misc";
 import { RankedBars } from "@/components/charts";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /**
  * Screen 7 — Morning Meeting Mode.
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils";
  * length, and §7 asks for it to be readable from five metres.
  */
 export default function Meeting() {
+  const t = useT();
   const queryClient = useQueryClient();
   const pack = useQuery({ queryKey: ["meeting"], queryFn: () => api.meetingPack() });
   const [delaying, setDelaying] = useState<string | null>(null);
@@ -52,9 +54,9 @@ export default function Meeting() {
   if (pack.error) {
     return (
       <div className="space-y-3">
-        <ErrorNote message={`Could not load the meeting pack: ${pack.error.message}`} />
+        <ErrorNote message={t("Could not load the meeting pack: {0}", { 0: pack.error.message })} />
         <Button size="lg" variant="outline" onClick={() => void pack.refetch()}>
-          Try again
+          {t("Try again")}
         </Button>
       </div>
     );
@@ -66,9 +68,9 @@ export default function Meeting() {
     <div className="meeting-scale space-y-6">
       <header className="rise flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="label mb-1.5">Morning meeting</p>
+          <p className="label mb-1.5">{t("Morning meeting")}</p>
           <h1 className="display text-[2rem] font-bold">
-            {new Date(d.business_date).toLocaleDateString("en-IN", {
+            {new Date(d.business_date).toLocaleDateString(activeLocale(), {
               weekday: "long",
               day: "numeric",
               month: "long",
@@ -80,15 +82,15 @@ export default function Meeting() {
           className="gap-1.5 px-3 py-1.5 text-sm"
         >
           {d.locked ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5" />}
-          {d.locked ? "Numbers locked" : "Shift not yet closed"}
+          {d.locked ? t("Numbers locked") : t("Shift not yet closed")}
         </Badge>
       </header>
 
       {/* ---- the three headline numbers ---------------------------------- */}
       <div className="grid gap-4 sm:grid-cols-3">
         <HeadlineCard
-          label="Recoverable"
-          hint="Money the plant can get back"
+          label={t("Recoverable")}
+          hint={t("Money the plant can get back")}
           accent="var(--color-loss)"
           delay={0}
         >
@@ -96,8 +98,8 @@ export default function Meeting() {
         </HeadlineCard>
 
         <HeadlineCard
-          label="Structural"
-          hint="Real, and not recoverable — never added above"
+          label={t("Structural")}
+          hint={t("Real, and not recoverable — never added above")}
           accent="var(--color-structural)"
           delay={70}
         >
@@ -105,14 +107,14 @@ export default function Meeting() {
         </HeadlineCard>
 
         <HeadlineCard
-          label="Downtime"
-          hint="Across every machine, all shifts"
+          label={t("Downtime")}
+          hint={t("Across every machine, all shifts")}
           accent="var(--color-accent)"
           delay={140}
         >
           <span className="figure text-[clamp(2.5rem,5vw,4rem)] font-bold leading-[0.98]">
             {Math.round(d.losses.total_minutes)}
-            <span className="text-2 ml-1.5 text-xl font-semibold">min</span>
+            <span className="text-2 ml-1.5 text-xl font-semibold">{t("min")}</span>
           </span>
         </HeadlineCard>
       </div>
@@ -123,12 +125,12 @@ export default function Meeting() {
           <CardHeader>
             <CardTitle className="flex items-center gap-1.5">
               <Timer className="size-3.5" />
-              Top downtime losses
+              {t("Top downtime losses")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {d.losses.recoverable.length === 0 ? (
-              <p className="text-3 py-10 text-center text-sm">Nothing recoverable logged.</p>
+              <p className="text-3 py-10 text-center text-sm">{t("Nothing recoverable logged.")}</p>
             ) : (
               <>
                 <RankedBars
@@ -141,7 +143,7 @@ export default function Meeting() {
                 />
                 {d.losses.structural.length ? (
                   <div className="mt-5 border-t pt-4">
-                    <p className="label mb-2.5">Structural — logged, not actionable</p>
+                    <p className="label mb-2.5">{t("Structural — logged, not actionable")}</p>
                     <ul className="space-y-1.5">
                       {d.losses.structural.slice(0, 3).map((line) => (
                         <li
@@ -167,12 +169,12 @@ export default function Meeting() {
           <CardHeader>
             <CardTitle className="flex items-center gap-1.5">
               <ShieldAlert className="size-3.5" />
-              Top quality losses by ₹
+              {t("Top quality losses by ₹")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {d.top_quality.length === 0 ? (
-              <p className="text-3 py-10 text-center text-sm">No rejections recorded.</p>
+              <p className="text-3 py-10 text-center text-sm">{t("No rejections recorded.")}</p>
             ) : (
               <RankedBars
                 items={d.top_quality.map((defect) => ({
@@ -199,29 +201,28 @@ export default function Meeting() {
             ) : (
               <ShieldAlert className="size-3.5" />
             )}
-            {d.actions_gate_cleared ? "Today's plan" : "Close yesterday first"}
+            {d.actions_gate_cleared ? t("Today's plan") : t("Close yesterday first")}
           </CardTitle>
           <Badge
             variant={d.actions_gate_cleared ? "recovered" : "warn"}
             className="ml-auto"
           >
             {d.actions_gate_cleared
-              ? "Gate cleared"
-              : `${d.blocking_actions.length} unaddressed`}
+              ? t("Gate cleared")
+              : t("{0} unaddressed", { 0: d.blocking_actions.length })}
           </Badge>
         </CardHeader>
         <CardContent>
           {!d.actions_gate_cleared ? (
             <p className="text-2 mb-4 text-sm leading-relaxed">
-              Each of these was escalated to root-cause work because it cleared the
-              severity bar. Mark it <strong>Done</strong>, or <strong>Delayed</strong>{" "}
-              with a reason. Silence is not an option — that is the discipline.
+              {t("Each of these was escalated to root-cause work because it cleared the severity bar. Mark it")}{" "}<strong>{t("Done")}</strong>{t(", or")}{" "}<strong>{t("Delayed")}</strong>{" "}
+              {t("with a reason. Silence is not an option — that is the discipline.")}
             </p>
           ) : null}
 
           {mark.error ? (
             <div className="mb-3">
-              <ErrorNote message={`Could not record that: ${mark.error.message}`} />
+              <ErrorNote message={t("Could not record that: {0}", { 0: mark.error.message })} />
             </div>
           ) : null}
 
@@ -243,13 +244,12 @@ export default function Meeting() {
                       <Badge
                         variant={action.meeting_status_today === "done" ? "recovered" : "neutral"}
                       >
-                        {action.meeting_status_today === "done" ? "Done today" : "Delayed today"}
+                        {action.meeting_status_today === "done" ? t("Done today") : t("Delayed today")}
                       </Badge>
                     ) : null}
                   </div>
                   <p className="text-3 mt-0.5 text-xs">
-                    {action.reference} · {action.owner ?? "unassigned"} · due{" "}
-                    {action.due_date ?? "—"}
+                    {t("{0} · {1} · due {2}", { 0: action.reference, 1: action.owner ?? "unassigned", 2: action.due_date ?? "—" })}
                   </p>
                 </div>
                 <Money value={action.cost_display} tone="loss" size="sm" />
@@ -262,10 +262,10 @@ export default function Meeting() {
                       disabled={mark.isPending}
                       onClick={() => mark.mutate({ id: action.id, status: "done" })}
                     >
-                      Done
+                      {t("Done")}
                     </Button>
                     <Button size="sm" className="h-11 px-4" variant="outline" onClick={() => setDelaying(action.id)}>
-                      Delayed
+                      {t("Delayed")}
                     </Button>
                   </div>
                 ) : null}
@@ -275,13 +275,13 @@ export default function Meeting() {
 
           {delaying ? (
             <div className="surface-2 mt-4 rounded-xl border p-4">
-              <Label htmlFor="delay-reason" className="mb-2 font-semibold">Why did it slip?</Label>
+              <Label htmlFor="delay-reason" className="mb-2 font-semibold">{t("Why did it slip?")}</Label>
               <Textarea
                 id="delay-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={2}
-                placeholder="Spare not available until Thursday"
+                placeholder={t("Spare not available until Thursday")}
                 autoFocus
               />
               <div className="mt-3 flex gap-2">
@@ -291,10 +291,10 @@ export default function Meeting() {
                   disabled={!reason.trim() || mark.isPending}
                   onClick={() => mark.mutate({ id: delaying, status: "delayed", why: reason.trim() })}
                 >
-                  Record
+                  {t("Record")}
                 </Button>
                 <Button size="sm" className="h-11 px-4" variant="ghost" onClick={() => setDelaying(null)}>
-                  Cancel
+                  {t("Cancel")}
                 </Button>
               </div>
             </div>

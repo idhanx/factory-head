@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, ErrorNote, Skeleton } from "@/components/ui/misc";
 import type { SkillMatrix, TrainingNeed } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * Skill Matrix AI (§3 Layer 5).
@@ -38,6 +39,7 @@ const LEVELS = [
 ] as const;
 
 export default function Skills() {
+  const t = useT();
   const session = loadSession();
   const canEdit = session ? can(session.roles, "owner", "supervisor", "consultant") : false;
   const canRefresh = session ? can(session.roles, ...SUPS) : false;
@@ -63,27 +65,26 @@ export default function Skills() {
         <div>
           <p className="label mb-1.5 flex items-center gap-1.5">
             <GraduationCap className="size-3" />
-            Layer 5 · Skill Matrix AI
+            {t("Layer 5 · Skill Matrix AI")}
           </p>
-          <h1 className="display text-[1.75rem] font-bold">Skill matrix</h1>
+          <h1 className="display text-[1.75rem] font-bold">{t("Skill matrix")}</h1>
           <p className="text-2 mt-1 max-w-2xl text-sm leading-relaxed">
-            Who can run what — connected to the downtime it causes when nobody can. Built
-            from the operator list and stops the plant already records; no new register.
+            {t("Who can run what — connected to the downtime it causes when nobody can. Built from the operator list and stops the plant already records; no new register.")}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-6">
           {canRefresh ? (
             <Button size="lg" variant="outline" onClick={() => refresh.mutate()} disabled={refresh.isPending}>
               <RefreshCw className={cn("size-4", refresh.isPending && "animate-spin")} />
-              {refresh.isPending ? "Refreshing…" : "Refresh training needs"}
+              {refresh.isPending ? t("Refreshing…") : t("Refresh training needs")}
             </Button>
           ) : null}
           <div>
-            <p className="label mb-1">Stations at risk</p>
+            <p className="label mb-1">{t("Stations at risk")}</p>
             <span className="figure text-[1.75rem] font-bold leading-none">{atRisk}</span>
           </div>
           <div>
-            <p className="label mb-1">Lost to no operator, per year</p>
+            <p className="label mb-1">{t("Lost to no operator, per year")}</p>
             <Money
               value={`₹${Math.round(measured / 100).toLocaleString("en-IN")}`}
               tone="loss"
@@ -94,53 +95,53 @@ export default function Skills() {
       </header>
 
       {refresh.error ? (
-        <ErrorNote message={`Could not refresh training needs: ${refresh.error.message}`} />
+        <ErrorNote message={t("Could not refresh training needs: {0}", { 0: refresh.error.message })} />
       ) : null}
       {refresh.isSuccess ? (
-        <p role="status" className="text-3 text-xs">Training needs recalculated from the latest stops and skills.</p>
+        <p role="status" className="text-3 text-xs">{t("Training needs recalculated from the latest stops and skills.")}</p>
       ) : null}
       {needs.error ? (
-        <ErrorNote message={`Could not load training needs: ${needs.error.message}`} />
+        <ErrorNote message={t("Could not load training needs: {0}", { 0: needs.error.message })} />
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <NeedList
-          title="Already costing money"
+          title={t("Already costing money")}
           icon={<UserX className="size-3.5" />}
-          hint="Stations that stopped for 'No Operator' at least twice in 90 days. Ranked by the measured loss."
+          hint={t("Stations that stopped for 'No Operator' at least twice in 90 days. Ranked by the measured loss.")}
           needs={gaps}
           loading={needs.isLoading}
           failed={Boolean(needs.error)}
           canEdit={canEdit}
-          empty="No station has lost time to a missing operator more than once."
+          empty={t("No station has lost time to a missing operator more than once.")}
         />
         <NeedList
-          title="One absence away"
+          title={t("One absence away")}
           icon={<AlertTriangle className="size-3.5" />}
-          hint="Stations fewer than two people can run. Nothing lost yet — shown as the cost of one idle shift. Bottlenecks first: they stop the line."
+          hint={t("Stations fewer than two people can run. Nothing lost yet — shown as the cost of one idle shift. Bottlenecks first: they stop the line.")}
           needs={coverage}
           loading={needs.isLoading}
           failed={Boolean(needs.error)}
           canEdit={canEdit}
-          empty="Every station has at least two competent operators."
+          empty={t("Every station has at least two competent operators.")}
         />
       </div>
 
       <Card className="rise" style={{ animationDelay: "120ms" }}>
         <CardHeader className="flex-wrap justify-between gap-3">
-          <CardTitle>Operators × stations</CardTitle>
+          <CardTitle>{t("Operators × stations")}</CardTitle>
           <Legend />
         </CardHeader>
         <CardContent>
           {matrix.isLoading ? (
             <Skeleton className="h-96" />
           ) : matrix.error ? (
-            <ErrorNote message={`Could not load the skill matrix: ${matrix.error.message}`} />
+            <ErrorNote message={t("Could not load the skill matrix: {0}", { 0: matrix.error.message })} />
           ) : !matrix.data || matrix.data.operators.length === 0 ? (
             <Empty
               icon={<GraduationCap className="size-6" />}
-              title="No operators yet"
-              hint="Operators come from template T5 during onboarding — names only, no logins."
+              title={t("No operators yet")}
+              hint={t("Operators come from template T5 during onboarding — names only, no logins.")}
             />
           ) : (
             <MatrixTable data={matrix.data} canEdit={canEdit} />
@@ -170,6 +171,7 @@ function NeedList({
   canEdit: boolean;
   empty: string;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const raise = useMutation({
     mutationFn: (id: string) => api.raiseTrainingAction(id),
@@ -193,7 +195,7 @@ function NeedList({
         {loading ? (
           <Skeleton className="h-40" />
         ) : failed ? (
-          <p className="text-3 py-8 text-center text-sm">Not loaded — see the error above.</p>
+          <p className="text-3 py-8 text-center text-sm">{t("Not loaded — see the error above.")}</p>
         ) : needs.length === 0 ? (
           <p className="text-3 py-8 text-center text-sm">{empty}</p>
         ) : (
@@ -204,15 +206,14 @@ function NeedList({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-bold">{need.station_code}</span>
-                      {need.is_bottleneck ? <Badge variant="stopped">Bottleneck</Badge> : null}
+                      {need.is_bottleneck ? <Badge variant="stopped">{t("Bottleneck")}</Badge> : null}
                       {need.kind === "gap" ? (
                         <span className="text-3 text-xs">
-                          {String(need.evidence.events ?? "")} stops ·{" "}
-                          {Math.round(Number(need.evidence.minutes ?? 0))} min
+                          {t("{0} stops · {1} min", { 0: String(need.evidence.events ?? ""), 1: Math.round(Number(need.evidence.minutes ?? 0)) })}
                         </span>
                       ) : (
                         <span className="text-3 text-xs">
-                          {String(need.evidence.certified_operators ?? 0)} certified
+                          {t("{0} certified", { 0: String(need.evidence.certified_operators ?? 0) })}
                         </span>
                       )}
                     </div>
@@ -222,12 +223,12 @@ function NeedList({
                     {need.kind === "gap" ? (
                       <>
                         <Money value={need.annual_loss_display} tone="loss" size="md" />
-                        <p className="text-3 text-[0.6875rem]">per year, measured</p>
+                        <p className="text-3 text-[0.6875rem]">{t("per year, measured")}</p>
                       </>
                     ) : (
                       <>
                         <Money value={need.exposure_per_day_display} tone="neutral" size="md" />
-                        <p className="text-3 text-[0.6875rem]">per idle shift</p>
+                        <p className="text-3 text-[0.6875rem]">{t("per idle shift")}</p>
                       </>
                     )}
                   </div>
@@ -238,8 +239,7 @@ function NeedList({
                       href="/actions"
                       className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-accent)] hover:underline"
                     >
-                      Tracked as an Action
-                      <ArrowUpRight className="size-3" />
+                      {t("Tracked as an Action")}<ArrowUpRight className="size-3" />
                     </Link>
                   ) : canEdit ? (
                     <Button
@@ -249,7 +249,7 @@ function NeedList({
                       onClick={() => raise.mutate(need.id)}
                     >
                       <Plus className="size-3.5" />
-                      Raise training action
+                      {t("Raise training action")}
                     </Button>
                   ) : null}
                 </div>
@@ -268,6 +268,7 @@ function NeedList({
 }
 
 function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -311,7 +312,7 @@ function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean })
         </div>
       ) : null}
       {canEdit ? (
-        <p className="text-3 mb-3 text-xs">Click a cell to step through the levels.</p>
+        <p className="text-3 mb-3 text-xs">{t("Click a cell to step through the levels.")}</p>
       ) : null}
 
       {/* A table wider than a phone scrolls inside its own container; the page
@@ -321,7 +322,7 @@ function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean })
           <thead>
             <tr>
               <th className="label sticky left-0 z-10 bg-[var(--surface)] pr-3 text-left align-bottom">
-                Operator
+                {t("Operator")}
               </th>
               {data.stations.map((station) => (
                 <th key={station.id} className="px-0.5 pb-1 align-bottom">
@@ -336,7 +337,7 @@ function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean })
                   </span>
                 </th>
               ))}
-              <th className="label pl-2 text-right align-bottom">Certified</th>
+              <th className="label pl-2 text-right align-bottom">{t("Certified")}</th>
             </tr>
           </thead>
           <tbody>
@@ -350,14 +351,14 @@ function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean })
                 </th>
                 {data.stations.map((station) => {
                   const level = operator.skills[station.id] ?? 0;
-                  const label = LEVELS[level]?.label ?? "Not trained";
+                  const label = t(LEVELS[level]?.label ?? "Not trained");
                   return (
                     <td key={station.id} className="p-0">
                       <button
                         type="button"
                         disabled={!canEdit || setSkill.isPending}
-                        title={`${operator.name} on ${station.code}: ${label}`}
-                        aria-label={`${operator.name} on ${station.code}: ${label}`}
+                        title={t("{0} on {1}: {2}", { 0: operator.name, 1: station.code, 2: label })}
+                        aria-label={t("{0} on {1}: {2}", { 0: operator.name, 1: station.code, 2: label })}
                         onClick={() =>
                           setSkill.mutate({
                             operator_id: operator.id,
@@ -390,7 +391,7 @@ function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean })
           <tfoot>
             <tr>
               <th className="label sticky left-0 z-10 bg-[var(--surface)] pt-2 pr-3 text-left">
-                Competent
+                {t("Competent")}
               </th>
               {data.stations.map((station) => (
                 <td key={station.id} className="pt-2 text-center">
@@ -401,7 +402,7 @@ function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean })
                     )}
                     title={
                       station.at_risk
-                        ? `Fewer than ${data.min_coverage} people can run ${station.code}`
+                        ? t("Fewer than {0} people can run {1}", { 0: data.min_coverage, 1: station.code })
                         : undefined
                     }
                   >
@@ -416,14 +417,14 @@ function MatrixTable({ data, canEdit }: { data: SkillMatrix; canEdit: boolean })
         </table>
       </div>
       <p className="text-3 mt-3 text-xs">
-        ★ bottleneck · a red count with ! means fewer than {data.min_coverage} people can run the
-        station alone.
+        {t("★ bottleneck · a red count with ! means fewer than {0} people can run the station alone.", { 0: data.min_coverage })}
       </p>
     </div>
   );
 }
 
 function Legend() {
+  const t = useT();
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       {LEVELS.map(({ level, label }) => (
@@ -442,7 +443,7 @@ function Legend() {
           >
             {level === 0 ? "·" : level}
           </span>
-          <span className="text-2 text-xs">{label}</span>
+          <span className="text-2 text-xs">{t(label)}</span>
         </span>
       ))}
     </div>

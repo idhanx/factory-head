@@ -16,6 +16,7 @@ import {
   JOB_STATUS_LABEL, NewJobOrderSheet, RepeatJobOrderSheet, isAssignable, jobLabel,
 } from "@/components/job-orders";
 import type { JobOrder, Station } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * Screens 1 and 6 — shift start, and the closure lock.
@@ -29,6 +30,7 @@ import type { JobOrder, Station } from "@/types/api";
  * would lock the shift without them.
  */
 export default function ShiftPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const shift = useQuery({ queryKey: ["shift"], queryFn: api.currentShift });
 
@@ -36,10 +38,10 @@ export default function ShiftPage() {
   if (shift.error) {
     return (
       <div className="space-y-4">
-        <h1 className="display text-[1.75rem] font-bold">Shift</h1>
-        <ErrorNote message={`Could not check for an open shift: ${shift.error.message}`} />
+        <h1 className="display text-[1.75rem] font-bold">{t("Shift")}</h1>
+        <ErrorNote message={t("Could not check for an open shift: {0}", { 0: shift.error.message })} />
         <Button size="lg" variant="outline" onClick={() => void shift.refetch()}>
-          Try again
+          {t("Try again")}
         </Button>
       </div>
     );
@@ -58,6 +60,7 @@ export default function ShiftPage() {
 
 /** Screen 1 — under 60 seconds. */
 function StartShift({ onDone }: { onDone: () => void }) {
+  const t = useT();
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -92,20 +95,18 @@ function StartShift({ onDone }: { onDone: () => void }) {
   return (
     <div className="space-y-6">
       <header className="rise">
-        <p className="label mb-1.5">Screen 1</p>
-        <h1 className="display text-[1.75rem] font-bold">Start shift</h1>
+        <p className="label mb-1.5">{t("Screen 1")}</p>
+        <h1 className="display text-[1.75rem] font-bold">{t("Start shift")}</h1>
         <p className="text-2 mt-1 max-w-2xl text-sm leading-relaxed">
-          Pick the shift, confirm what each line is running, tap Start. Everything recorded
-          after this inherits the job&apos;s part, customer, lot and operator — nobody types
-          them again.
+          {t("Pick the shift, confirm what each line is running, tap Start. Everything recorded after this inherits the job's part, customer, lot and operator — nobody types them again.")}
         </p>
       </header>
 
       {error ? <ErrorNote message={error} /> : null}
-      {loadError ? <ErrorNote message={`Could not load shift setup: ${loadError.message}`} /> : null}
+      {loadError ? <ErrorNote message={t("Could not load shift setup: {0}", { 0: loadError.message })} /> : null}
 
       <Card>
-        <CardHeader><CardTitle>Shift</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("Shift")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {(shifts.data ?? []).map((s) => (
             <button
@@ -129,24 +130,23 @@ function StartShift({ onDone }: { onDone: () => void }) {
           thing that stops a shift starting in under a minute. */}
       <Card>
         <CardHeader className="flex-wrap justify-between">
-          <CardTitle>Job orders</CardTitle>
+          <CardTitle>{t("Job orders")}</CardTitle>
           <Button size="lg" onClick={() => setCreating(true)}>
             <Plus className="size-4" />
-            New job order
+            {t("New job order")}
           </Button>
         </CardHeader>
         <CardContent>
           {created ? (
             <p role="status" className="surface-2 rise mb-3 rounded-xl border px-4 py-3 text-sm">
-              Job <span className="font-semibold">#{created.job_number}</span> created — pick it
-              for a station below.
+              {t("Job")}{" "}<span className="font-semibold">#{created.job_number}</span> {t("created — pick it for a station below.")}
             </p>
           ) : null}
           {jobs.isLoading ? (
             <Skeleton className="h-24" />
           ) : assignable.length === 0 ? (
             <p className="text-3 rounded-xl border border-dashed px-3 py-6 text-center text-sm">
-              No open job orders. Tap <strong>New job order</strong> to add today&apos;s work.
+              {t("No open job orders. Tap")}{" "}<strong>{t("New job order")}</strong> {t("to add today's work.")}
             </p>
           ) : (
             <ul className="divide-y">
@@ -158,9 +158,7 @@ function StartShift({ onDone }: { onDone: () => void }) {
                       {job.part_number ? <span className="text-2 font-normal"> · {job.part_number}</span> : null}
                     </p>
                     <p className="text-3 text-xs">
-                      {job.planned_quantity} pcs
-                      {job.customer_name ? ` · ${job.customer_name}` : ""}
-                      {job.due_date ? ` · due ${job.due_date}` : ""}
+                      {t("{0} pcs{1}{2}", { 0: job.planned_quantity, 1: job.customer_name ? ` · ${job.customer_name}` : "", 2: job.due_date ? t(" · due {0}", { 0: job.due_date }) : "" })}
                     </p>
                   </div>
                   {job.status !== "planned" ? (
@@ -168,7 +166,7 @@ function StartShift({ onDone }: { onDone: () => void }) {
                   ) : null}
                   <Button size="lg" variant="outline" onClick={() => setRepeating(job)}>
                     <Repeat className="size-4" />
-                    Repeat
+                    {t("Repeat")}
                   </Button>
                 </li>
               ))}
@@ -178,14 +176,14 @@ function StartShift({ onDone }: { onDone: () => void }) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Jobs per station</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{t("Jobs per station")}</CardTitle></CardHeader>
         <CardContent>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {producing.map((station) => (
               <div key={station.id} className="rounded-lg border p-3">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">{station.code}</span>
-                  {station.is_bottleneck ? <Badge variant="warn">Bottleneck</Badge> : null}
+                  {station.is_bottleneck ? <Badge variant="warn">{t("Bottleneck")}</Badge> : null}
                 </div>
                 <select
                   value={assignments[station.id] ?? ""}
@@ -198,9 +196,9 @@ function StartShift({ onDone }: { onDone: () => void }) {
                     })
                   }
                   className="mt-2 h-11 w-full rounded-lg border surface px-2 text-sm"
-                  aria-label={`Job for ${station.code}`}
+                  aria-label={t("Job for {0}", { 0: station.code })}
                 >
-                  <option value="">Not running</option>
+                  <option value="">{t("Not running")}</option>
                   {assignable.map((job: JobOrder) => (
                     <option key={job.id} value={job.id}>
                       {jobLabel(job)}
@@ -213,14 +211,14 @@ function StartShift({ onDone }: { onDone: () => void }) {
         </CardContent>
       </Card>
 
-      {!online ? <NeedsConnection what="Starting a shift" /> : null}
+      {!online ? <NeedsConnection what={t("Starting a shift")} /> : null}
       <Button
         size="xl"
         className="w-full sm:w-auto"
         disabled={!shiftId || start.isPending || !online}
         onClick={() => start.mutate()}
       >
-        {start.isPending ? "Starting…" : "Start shift"}
+        {start.isPending ? t("Starting…") : t("Start shift")}
       </Button>
 
       {creating ? (
@@ -245,6 +243,7 @@ function CloseShift({
   startedAt: string;
   onDone: () => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [overrideReason, setOverrideReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -267,7 +266,7 @@ function CloseShift({
       void queryClient.invalidateQueries({ queryKey: ["closure", sessionId] });
       void queryClient.invalidateQueries({ queryKey: ["escalations"] });
     },
-    onError: (e: Error) => setError(`Could not acknowledge: ${e.message}`),
+    onError: (e: Error) => setError(t("Could not acknowledge: {0}", { 0: e.message })),
   });
 
   const close = useMutation({
@@ -287,39 +286,42 @@ function CloseShift({
     <div className="space-y-6">
       <header className="rise flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="label mb-1.5">Screen 6 · the closure lock</p>
-          <h1 className="display text-[1.75rem] font-bold">Close shift</h1>
+          <p className="label mb-1.5">{t("Screen 6 · the closure lock")}</p>
+          <h1 className="display text-[1.75rem] font-bold">{t("Close shift")}</h1>
           <p className="text-2 mt-1 text-sm">
-            {businessDate} · started {formatClock(startedAt)}
+            {t("{0} · started {1}", { 0: businessDate, 1: formatClock(startedAt) })}
           </p>
         </div>
         {check.data ? (
           <Badge variant={canClose ? "recovered" : "warn"}>
-            {canClose ? "Ready to close" : `${blockers.length} to resolve`}
+            {canClose ? t("Ready to close") : t("{0} to resolve", { 0: blockers.length })}
           </Badge>
         ) : null}
       </header>
 
       {error ? <ErrorNote message={error} /> : null}
       {check.error ? (
-        <ErrorNote message={`Could not run the closure check: ${check.error.message}`} />
+        <ErrorNote message={t("Could not run the closure check: {0}", { 0: check.error.message })} />
       ) : null}
 
       {kpis.data ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="OEE" value={`${(kpis.data.oee * 100).toFixed(0)}%`} />
-          <Stat label="Produced" value={`${kpis.data.total_count}`} sub={`target ${kpis.data.target}`} />
+          <Stat label={t("Produced")} value={`${kpis.data.total_count}`} sub={`target ${kpis.data.target}`} />
           <Stat
-            label="Downtime"
+            label={t("Downtime")}
             value={`${Math.round(kpis.data.downtime_minutes)} min`}
             sub={
               typeof kpis.data.downtime_percent === "number"
-                ? `${pct(kpis.data.downtime_percent)} of planned · ${pct(kpis.data.recoverable_downtime_percent ?? 0)} recoverable`
+                ? t("{0} of planned · {1} recoverable", {
+                    0: pct(kpis.data.downtime_percent),
+                    1: pct(kpis.data.recoverable_downtime_percent ?? 0),
+                  })
                 : undefined
             }
           />
           <div className="surface elev-1 rounded-xl border p-4">
-            <p className="label mb-1.5">Recoverable loss</p>
+            <p className="label mb-1.5">{t("Recoverable loss")}</p>
             <Money
               value={`₹${(kpis.data.recoverable_loss_paise / 100).toLocaleString("en-IN")}`}
               tone="loss"
@@ -328,21 +330,25 @@ function CloseShift({
           </div>
           {typeof kpis.data.man_hours === "number" ? (
             <>
-              <Stat label="Man-hours" value={kpis.data.man_hours.toFixed(1)} sub="booked on this shift" />
+              <Stat label={t("Man-hours")} value={kpis.data.man_hours.toFixed(1)} sub={t("booked on this shift")} />
               <Stat
-                label="Productivity"
+                label={t("Productivity")}
                 value={
                   kpis.data.productivity_per_man_hour === null
                     ? "—"
                     : kpis.data.productivity_per_man_hour.toFixed(1)
                 }
-                sub={kpis.data.productivity_per_man_hour === null ? "no man-hours booked" : "good parts per man-hour"}
+                sub={
+                  kpis.data.productivity_per_man_hour === null
+                    ? t("no man-hours booked")
+                    : t("good parts per man-hour")
+                }
               />
               {typeof kpis.data.structural_downtime_percent === "number" ? (
                 <Stat
-                  label="Structural downtime"
+                  label={t("Structural downtime")}
                   value={pct(kpis.data.structural_downtime_percent)}
-                  sub="of planned time — logged, not actionable"
+                  sub={t("of planned time — logged, not actionable")}
                 />
               ) : null}
             </>
@@ -350,29 +356,27 @@ function CloseShift({
         </div>
       ) : null}
 
-      {!online ? <NeedsConnection what="Closing the shift" /> : null}
+      {!online ? <NeedsConnection what={t("Closing the shift")} /> : null}
       {online && unsent > 0 ? (
         <p role="status" className="rounded-xl border border-[var(--color-warn)] px-4 py-3 text-sm text-[var(--color-warn)]">
-          {unsent} entr{unsent === 1 ? "y is" : "ies are"} still on this tablet, waiting to sync. Let
-          them reach the server before closing, or they will be held for the owner to review.
+          {t("{0} entr{1} still on this tablet, waiting to sync. Let them reach the server before closing, or they will be held for the owner to review.", { 0: unsent, 1: unsent === 1 ? "y is" : "ies are" })}
         </p>
       ) : null}
 
       <Card className={canClose ? "" : "border-[var(--color-warn)]"}>
         <CardHeader>
-          <CardTitle>Before you go home</CardTitle>
+          <CardTitle>{t("Before you go home")}</CardTitle>
         </CardHeader>
         <CardContent>
           {check.isLoading ? (
             <Skeleton className="h-24" />
           ) : check.error ? (
             <p className="text-3 py-4 text-sm">
-              The checklist could not be loaded, so it is not known what is still open.
+              {t("The checklist could not be loaded, so it is not known what is still open.")}
             </p>
           ) : canClose ? (
             <p className="py-4 text-sm">
-              Everything is recorded. Closing locks this shift permanently — after this,
-              nothing inside it can be edited, by anyone.
+              {t("Everything is recorded. Closing locks this shift permanently — after this, nothing inside it can be edited, by anyone.")}
             </p>
           ) : (
             <ul className="divide-y">
@@ -392,8 +396,8 @@ function CloseShift({
                       onClick={() => acknowledge.mutate(blocker.reference_id!)}
                     >
                       {acknowledge.isPending && acknowledge.variables === blocker.reference_id
-                        ? "Acknowledging…"
-                        : "Acknowledge"}
+                        ? t("Acknowledging…")
+                        : t("Acknowledge")}
                     </Button>
                   ) : null}
                 </li>
@@ -405,24 +409,22 @@ function CloseShift({
 
       {canClose ? (
         <Button size="xl" onClick={() => close.mutate(undefined)} disabled={close.isPending || !online}>
-          {close.isPending ? "Closing…" : "Close and lock shift"}
+          {close.isPending ? t("Closing…") : t("Close and lock shift")}
         </Button>
       ) : (
         <Card>
-          <CardHeader><CardTitle>Owner override</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{t("Owner override")}</CardTitle></CardHeader>
           <CardContent>
             <p className="mb-3 text-sm text-2">
-              A supervisor should never have to invent a reason code to go home. An owner can
-              override — but the override, and this reason, are written to the audit trail and
-              appear in the monthly report.
+              {t("A supervisor should never have to invent a reason code to go home. An owner can override — but the override, and this reason, are written to the audit trail and appear in the monthly report.")}
             </p>
-            <Label htmlFor="override">Why is it being overridden?</Label>
+            <Label htmlFor="override">{t("Why is it being overridden?")}</Label>
             <Textarea
               id="override"
               rows={2}
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
-              placeholder="Operator left before logging the 1:10 PM stop; reason unknown"
+              placeholder={t("Operator left before logging the 1:10 PM stop; reason unknown")}
             />
             <Button
               className="mt-3"
@@ -430,7 +432,7 @@ function CloseShift({
               disabled={!overrideReason.trim() || close.isPending || !online}
               onClick={() => close.mutate(overrideReason.trim())}
             >
-              Close with override
+              {t("Close with override")}
             </Button>
           </CardContent>
         </Card>
@@ -440,11 +442,11 @@ function CloseShift({
 }
 
 function NeedsConnection({ what }: { what: string }) {
+  const t = useT();
   return (
     <p role="status" className="flex items-center gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-[var(--color-warn)]">
       <WifiOff className="size-4 shrink-0" />
-      Needs a connection. {what} cannot be saved on the tablet for later — try again when the
-      connection is back.
+      {t("Needs a connection.")}{" "}{what} {" "}{t("cannot be saved on the tablet for later — try again when the connection is back.")}
     </p>
   );
 }

@@ -32,6 +32,13 @@ scheduler.every(300, name="coach-briefings", lock_seconds=600)(
 scheduler.every(1800, name="stale-downtime", lock_seconds=300)(jobs.sweep_stale_open_events)
 # Audit readiness and training needs are re-scored here, not on page reads.
 scheduler.every(3600, name="plugin-refresh", lock_seconds=900)(jobs.refresh_plugins)
+# Kaizen follows its Core Actions: status for the operator, and the points
+# that only land once Core says the saving held.
+scheduler.every(3600, name="kaizen-sync", lock_seconds=600)(jobs.sync_kaizen)
+# A pattern is a management decision, not an alert — weekly is the cadence.
+scheduler.every(7 * 24 * 3600, name="kaizen-patterns", lock_seconds=1800)(
+    jobs.detect_kaizen_patterns
+)
 
 
 async def main() -> None:

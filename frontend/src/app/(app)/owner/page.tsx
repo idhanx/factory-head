@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ArrowUpRight, Clock, TrendingDown, TrendingUp } from "lucide-react";
 import { ApiError, api } from "@/lib/api";
-import { formatInr, formatMinutes } from "@/lib/format";
+import { formatInr, formatMinutes, activeLocale } from "@/lib/format";
 import { Money, MoneyCounter } from "@/components/ui/money";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, ErrorNote, Skeleton } from "@/components/ui/misc";
 import { LossTrend, RankedBars, RecoveredTrend, Sparkline } from "@/components/charts";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /**
  * Screen 8 — Owner Home.
@@ -37,6 +38,7 @@ import { cn } from "@/lib/utils";
  * understand OEE to use this product.
  */
 export default function OwnerHome() {
+  const t = useT();
   const home = useQuery({ queryKey: ["owner-home"], queryFn: () => api.ownerHome() });
   const trend = useQuery({ queryKey: ["trend"], queryFn: () => api.trend(28) });
 
@@ -59,17 +61,17 @@ export default function OwnerHome() {
     const forbidden = home.error instanceof ApiError && home.error.status === 403;
     return (
       <div className="space-y-4">
-        <h1 className="display text-[2rem] font-bold">Money</h1>
+        <h1 className="display text-[2rem] font-bold">{t("Money")}</h1>
         <ErrorNote
           message={
             forbidden
-              ? "These figures are for the plant owner. Your role cannot see them."
-              : `Could not load the money figures: ${home.error.message}`
+              ? t("These figures are for the plant owner. Your role cannot see them.")
+              : t("Could not load the money figures: {0}", { 0: home.error.message })
           }
         />
         {!forbidden ? (
           <Button size="lg" variant="outline" onClick={() => void home.refetch()}>
-            Try again
+            {t("Try again")}
           </Button>
         ) : null}
       </div>
@@ -77,7 +79,7 @@ export default function OwnerHome() {
   }
 
   if (!home.data) {
-    return <Empty title="No data yet" hint="Numbers appear once the first shift closes." />;
+    return <Empty title={t("No data yet")} hint={t("Numbers appear once the first shift closes.")} />;
   }
 
   const d = home.data;
@@ -95,28 +97,26 @@ export default function OwnerHome() {
     <div className="space-y-4">
       <header className="rise flex flex-wrap items-end justify-between gap-4 px-1 pb-1">
         <div>
-          <h1 className="display text-[2rem] font-bold">Money</h1>
+          <h1 className="display text-[2rem] font-bold">{t("Money")}</h1>
           <p className="text-2 mt-1 text-sm">
             {/* `as_of` is today; every figure on this screen is for the day
                 before it. Built from the date parts rather than `new Date(iso)`,
                 which parses as UTC midnight and can land on the wrong day. */}
-            Yesterday,{" "}
-            {(() => {
+            {t("Yesterday, {0}", { 0: (() => {
               const [y, m, day] = d.as_of.split("-").map(Number);
-              return new Date(y, m - 1, day - 1).toLocaleDateString("en-IN", {
+              return new Date(y, m - 1, day - 1).toLocaleDateString(activeLocale(), {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
               });
-            })()}
+            })() })}
           </p>
         </div>
         <Link
           href="/meeting"
           className="text-2 surface flex items-center gap-1.5 rounded-full border px-4 py-2.5 text-sm font-medium transition-colors hover:surface-2 hover:text-[var(--text)]"
         >
-          Morning meeting
-          <ArrowRight className="size-3.5" />
+          {t("Morning meeting")}<ArrowRight className="size-3.5" />
         </Link>
       </header>
 
@@ -124,8 +124,8 @@ export default function OwnerHome() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile
           href="/actions?state=verified"
-          label="Recovered profit"
-          hint="Verified, sustained fixes only"
+          label={t("Recovered profit")}
+          hint={t("Verified, sustained fixes only")}
           tone="feature"
           delay={0}
         >
@@ -149,8 +149,8 @@ export default function OwnerHome() {
 
         <StatTile
           href="/meeting"
-          label="Lost yesterday"
-          hint="Recoverable losses only"
+          label={t("Lost yesterday")}
+          hint={t("Recoverable losses only")}
           delay={60}
           chip={
             loss.length >= 14 ? (
@@ -160,7 +160,7 @@ export default function OwnerHome() {
                 ) : (
                   <TrendingUp className="size-3" />
                 )}
-                {Math.abs(delta * 100).toFixed(0)}% wk
+                {Math.abs(delta * 100).toFixed(0)}{t("% wk")}
               </Badge>
             ) : undefined
           }
@@ -180,18 +180,18 @@ export default function OwnerHome() {
 
         <StatTile
           href="/actions?state=open"
-          label="Actions"
-          hint={`${d.actions_open} still open`}
+          label={t("Actions")}
+          hint={t("{0} still open", { 0: d.actions_open })}
           delay={120}
           chip={
-            <Badge variant="neutral">{completion.toFixed(0)}% done</Badge>
+            <Badge variant="neutral">{t("{0}% done", { 0: completion.toFixed(0) })}</Badge>
           }
         >
           <div className="flex items-baseline gap-2">
             <span className="figure text-[2.5rem] font-bold leading-none">
               {d.actions_completed}
             </span>
-            <span className="text-3 text-sm">completed</span>
+            <span className="text-3 text-sm">{t("completed")}</span>
           </div>
           <div className="surface-inset mt-5 h-2 overflow-hidden rounded-full">
             <div
@@ -203,10 +203,10 @@ export default function OwnerHome() {
 
         <StatTile
           href="/actions?state=verified"
-          label="Running ROI"
-          hint="Recovered ÷ fees paid"
+          label={t("Running ROI")}
+          hint={t("Recovered ÷ fees paid")}
           delay={180}
-          chip={d.running_roi >= 1 ? <Badge variant="recovered">Paid back</Badge> : undefined}
+          chip={d.running_roi >= 1 ? <Badge variant="recovered">{t("Paid back")}</Badge> : undefined}
         >
           <div className="flex items-baseline gap-1">
             <span className="figure text-[2.5rem] font-bold leading-none">
@@ -216,8 +216,8 @@ export default function OwnerHome() {
           </div>
           <p className="text-3 mt-3 text-xs leading-relaxed">
             {d.running_roi >= 1
-              ? "The system has paid for itself."
-              : "Savings compound as fixes are verified."}
+              ? t("The system has paid for itself.")
+              : t("Savings compound as fixes are verified.")}
           </p>
         </StatTile>
       </div>
@@ -227,10 +227,9 @@ export default function OwnerHome() {
         <Card className="rise xl:col-span-2" style={{ animationDelay: "240ms" }}>
           <CardHeader className="justify-between">
             <div>
-              <CardTitle>Recoverable loss, last 28 days</CardTitle>
+              <CardTitle>{t("Recoverable loss, last 28 days")}</CardTitle>
               <p className="text-3 mt-1 text-xs normal-case tracking-normal">
-                Structural loss is shown dashed and never added in — it is real
-                money, and not money anyone can get back.
+                {t("Structural loss is shown dashed and never added in — it is real money, and not money anyone can get back.")}
               </p>
             </div>
           </CardHeader>
@@ -238,7 +237,7 @@ export default function OwnerHome() {
             {trend.isLoading ? (
               <Skeleton className="h-60" />
             ) : trend.error ? (
-              <ErrorNote message={`Could not load the trend: ${trend.error.message}`} />
+              <ErrorNote message={t("Could not load the trend: {0}", { 0: trend.error.message })} />
             ) : (
               <LossTrend data={loss} />
             )}
@@ -247,13 +246,12 @@ export default function OwnerHome() {
 
         <Card tone="feature" className="rise" style={{ animationDelay: "300ms" }}>
           <CardHeader>
-            <CardTitle>Recovered profit, cumulative</CardTitle>
+            <CardTitle>{t("Recovered profit, cumulative")}</CardTitle>
           </CardHeader>
           <CardContent>
             <RecoveredTrend data={trend.data?.recovered ?? []} />
             <p className="text-3 mt-3 text-xs leading-relaxed">
-              Credited only after a fix has held for two consecutive weeks, never
-              counted twice, and never below zero.
+              {t("Credited only after a fix has held for two consecutive weeks, never counted twice, and never below zero.")}
             </p>
           </CardContent>
         </Card>
@@ -263,19 +261,18 @@ export default function OwnerHome() {
       <div className="grid items-start gap-4 xl:grid-cols-3">
         <Card className="rise xl:col-span-2" style={{ animationDelay: "360ms" }}>
           <CardHeader className="justify-between">
-            <CardTitle>Yesterday&apos;s biggest recoverable losses</CardTitle>
+            <CardTitle>{t("Yesterday's biggest recoverable losses")}</CardTitle>
             <Link
               href="/meeting"
               className="text-brand ml-auto flex items-center gap-1 text-xs font-semibold hover:underline"
             >
-              Full table
-              <ArrowUpRight className="size-3" />
+              {t("Full table")}<ArrowUpRight className="size-3" />
             </Link>
           </CardHeader>
           <CardContent>
             {d.top_losses.length === 0 ? (
               <p className="text-3 py-10 text-center text-sm">
-                Nothing recoverable logged yesterday.
+                {t("Nothing recoverable logged yesterday.")}
               </p>
             ) : (
               <RankedBars
@@ -293,23 +290,22 @@ export default function OwnerHome() {
         <div className="rise space-y-4" style={{ animationDelay: "420ms" }}>
           <Card>
             <CardHeader>
-              <CardTitle>Month so far</CardTitle>
+              <CardTitle>{t("Month so far")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
-                <p className="text-3 mb-1 text-xs">Recoverable</p>
+                <p className="text-3 mb-1 text-xs">{t("Recoverable")}</p>
                 <Money value={d.lost_month_to_date_display} tone="loss" size="lg" />
               </div>
               <div>
                 <div className="mb-1 flex items-center gap-2">
-                  <p className="text-3 text-xs">Annualised</p>
+                  <p className="text-3 text-xs">{t("Annualised")}</p>
                   {/* §8.1: "always labelled as a projection, never as fact". */}
-                  <Badge variant="warn">Projection</Badge>
+                  <Badge variant="warn">{t("Projection")}</Badge>
                 </div>
                 <Money value={d.annualised_projection_display} tone="loss" size="lg" />
                 <p className="text-3 mt-1.5 text-xs leading-relaxed">
-                  Current 4-week run-rate × 13. Not a forecast of what you will
-                  lose — a measure of what is on the table.
+                  {t("Current 4-week run-rate × 13. Not a forecast of what you will lose — a measure of what is on the table.")}
                 </p>
               </div>
             </CardContent>
@@ -319,7 +315,7 @@ export default function OwnerHome() {
             <CardHeader>
               <CardTitle className="flex items-center gap-1.5">
                 <Clock className="size-3.5" />
-                Structural
+                {t("Structural")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -329,9 +325,7 @@ export default function OwnerHome() {
                 size="lg"
               />
               <p className="text-3 mt-2 text-xs leading-relaxed">
-                Planned maintenance, power cuts, no-order time. Reported
-                separately and never added to the recoverable figure — mixing
-                them is how a number stops being trusted.
+                {t("Planned maintenance, power cuts, no-order time. Reported separately and never added to the recoverable figure — mixing them is how a number stops being trusted.")}
               </p>
             </CardContent>
           </Card>

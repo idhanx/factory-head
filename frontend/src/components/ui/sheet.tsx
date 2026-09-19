@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 /**
  * A bottom sheet on a phone, a centred dialog on anything wider.
@@ -24,6 +25,7 @@ export function Sheet({
   children: React.ReactNode;
   className?: string;
 }) {
+  const t = useT();
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -52,7 +54,7 @@ export function Sheet({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("Close")}
             className="text-3 grid size-11 shrink-0 place-items-center rounded-lg border transition-colors hover:surface-2 hover:text-[var(--text)]"
           >
             <X className="size-4" />

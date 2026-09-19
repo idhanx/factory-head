@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, ErrorNote, Skeleton } from "@/components/ui/misc";
 import { cn } from "@/lib/utils";
 import type { Action } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * Screen 9 — the Actions Board.
@@ -83,6 +84,7 @@ export default function ActionsBoardPage() {
 }
 
 function ActionsBoard() {
+  const t = useT();
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -98,10 +100,10 @@ function ActionsBoard() {
   if (actions.error) {
     return (
       <div className="space-y-4">
-        <h1 className="display text-[1.75rem] font-bold">Actions</h1>
-        <ErrorNote message={`Could not load actions: ${actions.error.message}`} />
+        <h1 className="display text-[1.75rem] font-bold">{t("Actions")}</h1>
+        <ErrorNote message={t("Could not load actions: {0}", { 0: actions.error.message })} />
         <Button size="lg" variant="outline" onClick={() => void actions.refetch()}>
-          Try again
+          {t("Try again")}
         </Button>
       </div>
     );
@@ -128,20 +130,20 @@ function ActionsBoard() {
     <div className="space-y-6">
       <header className="rise flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="label mb-1.5">Improvement loop</p>
-          <h1 className="display text-[1.75rem] font-bold">Actions</h1>
+          <p className="label mb-1.5">{t("Improvement loop")}</p>
+          <h1 className="display text-[1.75rem] font-bold">{t("Actions")}</h1>
           <p className="text-2 mt-1 text-sm">
-            {all.length} tracked
+            {t("{0} tracked", { 0: all.length })}
             {overdue ? (
-              <span className="text-[var(--color-loss)]"> · {overdue} overdue</span>
+              <span className="text-[var(--color-loss)]"> {t("· {0} overdue", { 0: overdue })}</span>
             ) : null}
-            {cancelled.length ? <span> · {cancelled.length} cancelled</span> : null}
+            {cancelled.length ? <span> {t("· {0} cancelled", { 0: cancelled.length })}</span> : null}
           </p>
         </div>
 
         <div className="flex flex-wrap items-end gap-6">
           <div>
-            <p className="label mb-1">Recovered</p>
+            <p className="label mb-1">{t("Recovered")}</p>
             <Money
               value={`₹${(recovered / 100).toLocaleString("en-IN")}`}
               tone="recovered"
@@ -172,7 +174,7 @@ function ActionsBoard() {
       <div
         className="surface-2 flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-xl border p-1"
         role="tablist"
-        aria-label="Filter by state"
+        aria-label={t("Filter by state")}
       >
         {(Object.keys(STATE_FILTERS) as StateFilter[]).map((key) => (
           <button
@@ -186,7 +188,7 @@ function ActionsBoard() {
               stateFilter === key ? "brand font-semibold" : "text-2 hover:text-[var(--text)]",
             )}
           >
-            {STATE_FILTERS[key].label}
+            {t(STATE_FILTERS[key].label)}
             {key === "cancelled" ? <span className="tnum opacity-70">{cancelled.length}</span> : null}
           </button>
         ))}
@@ -196,8 +198,8 @@ function ActionsBoard() {
         visible.length === 0 ? (
           <Empty
             icon={<Ban className="size-6" />}
-            title="No cancelled actions"
-            hint="An action cancelled from its detail page lands here — off the board, still on record."
+            title={t("No cancelled actions")}
+            hint={t("An action cancelled from its detail page lands here — off the board, still on record.")}
           />
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -211,8 +213,8 @@ function ActionsBoard() {
       ) : all.length === 0 ? (
         <Empty
           icon={<ClipboardList className="size-6" />}
-          title="No actions yet"
-          hint="Actions are created at shift close, from events that cross the plant's cost, duration or recurrence thresholds. Everything below those thresholds stays logged and costed — and generates no work. A system that spawns forty open actions a week dies of action fatigue."
+          title={t("No actions yet")}
+          hint={t("Actions are created at shift close, from events that cross the plant's cost, duration or recurrence thresholds. Everything below those thresholds stays logged and costed — and generates no work. A system that spawns forty open actions a week dies of action fatigue.")}
         />
       ) : (
         <div className={cn("grid gap-4", GRID_COLS[columns.length])}>
@@ -236,11 +238,11 @@ function ActionsBoard() {
                   />
                   <div className="px-3.5 py-3">
                     <div className="flex items-baseline justify-between gap-2">
-                      <h2 className="text-sm font-bold">{column.label}</h2>
+                      <h2 className="text-sm font-bold">{t(column.label)}</h2>
                       <span className="label">{column.phase}</span>
                     </div>
                     <div className="mt-1 flex items-baseline justify-between gap-2">
-                      <span className="text-3 text-xs">{column.hint}</span>
+                      <span className="text-3 text-xs">{t(column.hint)}</span>
                       <span className="tnum text-3 text-xs font-semibold">{items.length}</span>
                     </div>
                     {columnTotal > 0 ? (
@@ -257,7 +259,7 @@ function ActionsBoard() {
                 <div className="space-y-2">
                   {items.length === 0 ? (
                     <p className="text-3 rounded-xl border border-dashed px-3 py-8 text-center text-xs">
-                      Nothing here
+                      {t("Nothing here")}
                     </p>
                   ) : (
                     items.slice(0, 25).map((action) => (
@@ -265,7 +267,7 @@ function ActionsBoard() {
                     ))
                   )}
                   {items.length > 25 ? (
-                    <p className="text-3 px-1 text-xs">+{items.length - 25} more</p>
+                    <p className="text-3 px-1 text-xs">{t("+{0} more", { 0: items.length - 25 })}</p>
                   ) : null}
                 </div>
               </section>
@@ -278,6 +280,7 @@ function ActionsBoard() {
 }
 
 function ActionCard({ action }: { action: Action }) {
+  const t = useT();
   return (
     <Link
       href={`/actions/${action.id}`}
@@ -298,16 +301,16 @@ function ActionCard({ action }: { action: Action }) {
             RCA
           </Badge>
         ) : null}
-        {action.is_overdue ? <Badge variant="stopped">Overdue</Badge> : null}
-        {action.state === "cancelled" ? <Badge variant="structural">Cancelled</Badge> : null}
+        {action.is_overdue ? <Badge variant="stopped">{t("Overdue")}</Badge> : null}
+        {action.state === "cancelled" ? <Badge variant="structural">{t("Cancelled")}</Badge> : null}
         {action.state === "reopened" ? (
           <Badge variant="stopped" className="gap-1">
             <Repeat2 className="size-2.5" />
-            Reopened
+            {t("Reopened")}
           </Badge>
         ) : null}
         {action.occurrence_count > 1 ? (
-          <Badge variant="neutral">{action.occurrence_count}× pattern</Badge>
+          <Badge variant="neutral">{t("{0}× pattern", { 0: action.occurrence_count })}</Badge>
         ) : null}
         {action.recovered_profit_paise > 0 ? (
           <Badge variant="recovered">
@@ -319,7 +322,7 @@ function ActionCard({ action }: { action: Action }) {
       {action.owner_name ? (
         <p className="text-3 mt-2 text-[0.6875rem]">
           {action.owner_name}
-          {action.due_date ? ` · due ${action.due_date}` : ""}
+          {action.due_date ? t(" · due {0}", { 0: action.due_date }) : ""}
         </p>
       ) : null}
     </Link>

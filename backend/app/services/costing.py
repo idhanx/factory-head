@@ -34,6 +34,7 @@ from app.models import (
     MarginBandValue,
     Part,
     Plant,
+    RateSource,
     RoutingOperation,
     Station,
 )
@@ -248,6 +249,73 @@ async def _margin_for(
             return (band.value, f"band {band_code} ({part.part_family})")
 
     return (0, "missing")
+
+
+# ---------------------------------------------------------------------------
+# Per-unit rates (electricity, compressed air, scrap recovery)
+# ---------------------------------------------------------------------------
+
+#: Scope refs for the per-unit rates the cost master holds. Effective-dated like
+#: every other rate, so re-costing a locked period reproduces its own numbers.
+ELECTRICITY_KWH = "electricity_kwh"
+COMPRESSED_AIR_M3 = "compressed_air_m3"
+SCRAP_RECOVERY_KG = "scrap_recovery_kg"
+
+UTILITY_KEYS = (ELECTRICITY_KWH, COMPRESSED_AIR_M3, SCRAP_RECOVERY_KG)
+
+UTILITY_LABELS: dict[str, str] = {
+    ELECTRICITY_KWH: "Electricity rate per unit (kWh)",
+    COMPRESSED_AIR_M3: "Compressed air cost per m³",
+    SCRAP_RECOVERY_KG: "Scrap sale recovery per kg",
+}
+
+
+async def utility_rate(
+    session: AsyncSession, *, plant_id: uuid.UUID, key: str, on_date: date
+) -> tuple[int, str]:
+    """A per-unit rate from the cost master, in paise. ``0`` when unset.
+
+    Ignoring the scrap recovery rate overstates every scrap saving by 20-30%,
+    which is why it sits here beside the rates rather than being assumed away.
+    """
+    if key not in UTILITY_KEYS:
+        raise ValueError(f"Unknown utility rate {key!r}")
+    return await _rate_for(session, plant_id, "utility", key, on_date, "unit_rate")
+
+
+async def set_utility_rate(
+    session: AsyncSession,
+    *,
+    plant_id: uuid.UUID,
+    key: str,
+    paise: int,
+    effective_from: date,
+    source: RateSource = RateSource.DERIVED,
+    derivation: dict | None = None,
+) -> CostRate:
+    """Write a per-unit rate into the cost master, with its audit trail.
+
+    Called from the Kaizen approval card when the plant supplies a rate for the
+    first time. It lands in Core's own cost master and is immediately visible
+    and editable in Core's cost screens — never in a plugin-local store.
+    """
+    if key not in UTILITY_KEYS:
+        raise ValueError(f"Unknown utility rate {key!r}")
+    if paise <= 0:
+        raise ValueError("A cost rate must be greater than zero")
+
+    row = CostRate(
+        plant_id=plant_id,
+        scope="utility",
+        scope_ref=key,
+        unit_rate=paise,
+        source=source,
+        derivation=derivation,
+        effective_from=effective_from,
+    )
+    session.add(row)
+    await session.flush()
+    return row
 
 
 def apply_snapshot(row, snapshot: CostSnapshot, cost: DowntimeCost | None = None) -> None:

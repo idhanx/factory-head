@@ -10,6 +10,7 @@ import {
   ActiveBadge, DataTable, ListState, Notice, RecordForm, RowButton, Toolbar,
   forEdit, invalidateMaster, toValues, type Column, type FieldSpec, type FormValues,
 } from "./shared";
+import { useT } from "@/lib/i18n";
 
 /**
  * The seven master tables behind every picker in the app.
@@ -60,6 +61,39 @@ const ROLE_TAGS = [
 const muted = (text: string | null | undefined) =>
   text ? text : <span className="text-3">—</span>;
 
+/* Column cells are declared in module-level config objects, so they cannot call
+   a hook themselves. Anything with words in it becomes a one-line component
+   that can. */
+function BottleneckBadge() {
+  const t = useT();
+  return <Badge variant="warn">{t("Bottleneck")}</Badge>;
+}
+
+function MarginBandBadge({ band }: { band: string }) {
+  const t = useT();
+  return <Badge variant="neutral">{t("Band {0}", { 0: band })}</Badge>;
+}
+
+function BreakMinutes({ minutes }: { minutes: number }) {
+  const t = useT();
+  return <span className="tnum">{t("{0} min", { 0: minutes })}</span>;
+}
+
+function EscalationBadge({ level }: { level: number }) {
+  const t = useT();
+  return <Badge variant="neutral">{t("L{0}", { 0: level })}</Badge>;
+}
+
+function RecoverabilityBadge({ recoverability }: { recoverability: string }) {
+  const t = useT();
+  const recoverable = recoverability === "R";
+  return (
+    <Badge variant={recoverable ? "recoverable" : "structural"}>
+      {recoverable ? t("Recoverable") : t("Structural")}
+    </Badge>
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 export const STATIONS: MasterConfig<"stations"> = {
@@ -78,7 +112,7 @@ export const STATIONS: MasterConfig<"stations"> = {
       cell: (r) => (
         <span className="flex items-center gap-2">
           <span className="tnum">{Number(r.bottleneck_factor).toFixed(2)}</span>
-          {r.is_bottleneck ? <Badge variant="warn">Bottleneck</Badge> : null}
+          {r.is_bottleneck ? <BottleneckBadge /> : null}
         </span>
       ),
     },
@@ -132,7 +166,7 @@ export const PARTS: MasterConfig<"parts"> = {
         r.contribution_margin_rupees !== null && r.contribution_margin_rupees !== undefined ? (
           <span className="money">₹{Number(r.contribution_margin_rupees).toLocaleString("en-IN")}</span>
         ) : r.margin_band ? (
-          <Badge variant="neutral">Band {r.margin_band}</Badge>
+          <MarginBandBadge band={r.margin_band} />
         ) : (
           <span className="text-3">—</span>
         ),
@@ -182,9 +216,7 @@ export const REASON_CODES: MasterConfig<"reason-codes"> = {
     {
       header: "Type",
       cell: (r) => (
-        <Badge variant={r.recoverability === "R" ? "recoverable" : "structural"}>
-          {r.recoverability === "R" ? "Recoverable" : "Structural"}
-        </Badge>
+        <RecoverabilityBadge recoverability={r.recoverability} />
       ),
     },
     { header: "OEE", cell: (r) => <span className="capitalize">{r.oee_treatment}</span> },
@@ -292,7 +324,7 @@ export const SHIFTS: MasterConfig<"shifts"> = {
         </span>
       ),
     },
-    { header: "Break", cell: (r) => <span className="tnum">{r.break_minutes} min</span> },
+    { header: "Break", cell: (r) => <BreakMinutes minutes={r.break_minutes} /> },
     { header: "Weekly off", cell: (r) => muted(r.weekly_off) },
     { header: "Status", cell: (r) => <ActiveBadge active={r.is_active} /> },
   ],
@@ -322,9 +354,9 @@ export const ALERT_RECIPIENTS: MasterConfig<"alert-recipients"> = {
   name: (row) => row.name,
   columns: [
     { header: "Name", cell: (r) => <span className="font-semibold">{r.name}</span> },
-    { header: "Role", cell: (r) => ROLE_TAGS.find((t) => t.value === r.role_tag)?.label ?? r.role_tag },
+    { header: "Role", cell: (r) => ROLE_TAGS.find((tag) => tag.value === r.role_tag)?.label ?? r.role_tag },
     { header: "WhatsApp", cell: (r) => <span className="tnum">{muted(r.whatsapp_number)}</span> },
-    { header: "Level", cell: (r) => <Badge variant="neutral">L{r.escalation_level}</Badge> },
+    { header: "Level", cell: (r) => <EscalationBadge level={r.escalation_level} /> },
     { header: "Status", cell: (r) => <ActiveBadge active={r.is_active} /> },
   ],
   fields: [
@@ -356,6 +388,7 @@ export const ALERT_RECIPIENTS: MasterConfig<"alert-recipients"> = {
 // ---------------------------------------------------------------------------
 
 export function MasterTab<K extends MasterResource>({ config }: { config: MasterConfig<K> }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [showInactive, setShowInactive] = useState(false);
   const [editing, setEditing] = useState<Row<K> | "new" | null>(null);
@@ -388,11 +421,15 @@ export function MasterTab<K extends MasterResource>({ config }: { config: Master
       invalidateMaster(queryClient, resource);
       setNotice(
         row.is_active
-          ? `${config.name(row)} deactivated. It no longer appears in pickers; turn on "Show inactive" to bring it back.`
-          : `${config.name(row)} is active again.`,
+          ? t(
+              '{0} deactivated. It no longer appears in pickers; turn on "Show inactive" to bring it back.',
+              { 0: config.name(row) },
+            )
+          : t("{0} is active again.", { 0: config.name(row) }),
       );
     },
-    onError: (e: Error, row) => setNotice(`Could not change ${config.name(row)}: ${e.message}`),
+    onError: (e: Error, row) =>
+      setNotice(t("Could not change {0}: {1}", { 0: config.name(row), 1: e.message })),
   });
 
   // The server filters too; this keeps a stale cache from showing a retired row.
@@ -405,7 +442,7 @@ export function MasterTab<K extends MasterResource>({ config }: { config: Master
         hint={config.hint}
         showInactive={showInactive}
         onShowInactive={setShowInactive}
-        addLabel={`Add ${noun}`}
+        addLabel={t("Add {0}", { 0: t(noun) })}
         onAdd={() => {
           save.reset();
           setEditing("new");
@@ -417,8 +454,8 @@ export function MasterTab<K extends MasterResource>({ config }: { config: Master
         loading={list.isLoading}
         error={list.error}
         empty={rows.length === 0}
-        emptyTitle={`No ${config.title.toLowerCase()} yet`}
-        emptyHint={`Add one here, or upload the onboarding template.`}
+        emptyTitle={t("No {0} yet", { 0: t(config.title).toLowerCase() })}
+        emptyHint={t("Add one here, or upload the onboarding template.")}
         onRetry={() => void list.refetch()}
       >
         <DataTable
@@ -432,18 +469,22 @@ export function MasterTab<K extends MasterResource>({ config }: { config: Master
                   save.reset();
                   setEditing(row);
                 }}
-                aria-label={`Edit ${config.name(row)}`}
+                aria-label={t("Edit {0}", { 0: config.name(row) })}
               >
-                Edit
+                {t("Edit")}
               </RowButton>
               <RowButton
                 variant="ghost"
                 className="border"
                 disabled={toggle.isPending}
                 onClick={() => toggle.mutate(row)}
-                aria-label={`${row.is_active ? "Deactivate" : "Activate"} ${config.name(row)}`}
+                aria-label={
+                  row.is_active
+                    ? t("Deactivate {0}", { 0: config.name(row) })
+                    : t("Activate {0}", { 0: config.name(row) })
+                }
               >
-                {row.is_active ? "Deactivate" : "Activate"}
+                {row.is_active ? t("Deactivate") : t("Activate")}
               </RowButton>
             </>
           )}
@@ -452,14 +493,18 @@ export function MasterTab<K extends MasterResource>({ config }: { config: Master
 
       {editing ? (
         <Sheet
-          title={editing === "new" ? `Add ${noun}` : `Edit ${config.name(editing)}`}
+          title={
+            editing === "new"
+              ? t("Add {0}", { 0: t(noun) })
+              : t("Edit {0}", { 0: config.name(editing) })
+          }
           onClose={() => setEditing(null)}
         >
           <RecordForm
             idPrefix={`${resource}-form`}
             fields={editing === "new" ? config.fields : forEdit(config.fields)}
             initial={editing === "new" ? config.defaults : { ...config.defaults, ...toValues(editing, config.fields) }}
-            submitLabel={editing === "new" ? `Add ${noun}` : "Save changes"}
+            submitLabel={editing === "new" ? t("Add {0}", { 0: t(noun) }) : t("Save changes")}
             busy={save.isPending}
             serverError={save.error?.message}
             onSubmit={(payload) => save.mutate({ id: editing === "new" ? null : editing.id, payload })}

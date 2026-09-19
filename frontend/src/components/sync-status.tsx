@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Empty, ErrorNote } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
+import { useT } from "@/lib/i18n";
 
 /**
  * Where the tablet's unsent entries are visible.
@@ -57,6 +58,7 @@ export function useSyncAgent() {
 }
 
 export function SyncPill() {
+  const t = useT();
   const online = useSync((s) => s.online);
   const pending = useSync((s) => s.pendingCount);
   const rejected = useSync((s) => s.rejectedCount);
@@ -69,28 +71,28 @@ export function SyncPill() {
     ? {
         tone: "bg-[var(--color-stopped-dim)] text-[var(--color-loss)] border-transparent",
         Icon: CloudOff,
-        long: saved ? `Offline — ${saved} saved on this tablet` : "Offline",
-        short: saved ? `Offline · ${saved}` : "Offline",
+        long: saved ? t("Offline — {0} saved on this tablet", { 0: saved }) : t("Offline"),
+        short: saved ? t("Offline · {0}", { 0: saved }) : t("Offline"),
       }
     : rejected
       ? {
           tone: "bg-[var(--color-stopped-dim)] text-[var(--color-loss)] border-transparent",
           Icon: TriangleAlert,
-          long: `${rejected} not accepted`,
-          short: `${rejected} not accepted`,
+          long: t("{0} not accepted", { 0: rejected }),
+          short: t("{0} not accepted", { 0: rejected }),
         }
       : pending
         ? {
             tone: "bg-[var(--color-warn-dim)] text-[var(--color-warn)] border-transparent",
             Icon: syncing ? RefreshCw : CloudUpload,
-            long: `${pending} waiting to sync`,
-            short: `${pending} waiting`,
+            long: t("{0} waiting to sync", { 0: pending }),
+            short: t("{0} waiting", { 0: pending }),
           }
         : {
             tone: "bg-[var(--color-running-dim)] text-[var(--color-running)] border-transparent",
             Icon: CircleCheck,
-            long: "Synced",
-            short: "Synced",
+            long: t("Synced"),
+            short: t("Synced"),
           };
 
   return (
@@ -101,18 +103,18 @@ export function SyncPill() {
           variant="outline"
           className="h-11"
           onClick={() => window.location.reload()}
-          title="A newer version of the app is ready"
+          title={t("A newer version of the app is ready")}
         >
           <RefreshCw className="size-4" />
-          <span className="hidden md:inline">Update ready — reload</span>
-          <span className="md:hidden">Update</span>
+          <span className="hidden md:inline">{t("Update ready — reload")}</span>
+          <span className="md:hidden">{t("Update")}</span>
         </Button>
       ) : null}
       <button
         type="button"
         onClick={() => openSyncSheet(true)}
         aria-haspopup="dialog"
-        aria-label={`Sync status: ${view.long}. Open the list.`}
+        aria-label={t("Sync status: {0}. Open the list.", { 0: view.long })}
         className={cn(
           "flex h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 text-[0.8125rem] font-semibold transition-[filter] hover:brightness-95",
           view.tone,
@@ -138,6 +140,7 @@ function describe(meta: OutboxOp["meta"]): string {
 }
 
 function SyncSheet({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const ops = useSync((s) => s.ops);
   const held = useSync((s) => s.held);
   const online = useSync((s) => s.online);
@@ -155,19 +158,19 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
     try {
       await work();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "That did not work.");
+      setError(e instanceof Error ? e.message : t("That did not work."));
     }
   };
 
   return (
     <Sheet
-      title="Entries on this tablet"
+      title={t("Entries on this tablet")}
       subtitle={
         online
           ? lastSyncedAt
-            ? `Connected · last synced ${formatClock(lastSyncedAt)}`
-            : "Connected"
-          : "Offline — entries are kept here and sent when the connection returns."
+            ? t("Connected · last synced {0}", { 0: formatClock(lastSyncedAt) })
+            : t("Connected")
+          : t("Offline — entries are kept here and sent when the connection returns.")
       }
       onClose={onClose}
     >
@@ -179,9 +182,9 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
             onClick={() => void run(() => flush({ force: true }))}
           >
             <RefreshCw className={cn("size-4", syncing && "animate-spin")} />
-            {syncing ? "Sending…" : "Retry now"}
+            {syncing ? t("Sending…") : t("Retry now")}
           </Button>
-          {!networkOnline ? <span className="text-3 text-sm">Needs a connection.</span> : null}
+          {!networkOnline ? <span className="text-3 text-sm">{t("Needs a connection.")}</span> : null}
         </div>
 
         {error ? <ErrorNote message={error} /> : null}
@@ -189,11 +192,10 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
         {rejected.length ? (
           <section aria-labelledby="sync-rejected">
             <h3 id="sync-rejected" className="label mb-2 text-[var(--color-loss)]">
-              Not accepted ({rejected.length})
+              {t("Not accepted ({0})", { 0: rejected.length })}
             </h3>
             <p className="text-2 mb-3 text-sm leading-relaxed">
-              The server refused these and will keep refusing them as they are. Fix the cause
-              (for example, open the shift) and try again, or discard the entry.
+              {t("The server refused these and will keep refusing them as they are. Fix the cause (for example, open the shift) and try again, or discard the entry.")}
             </p>
             <ul className="divide-y rounded-xl border">
               {rejected.map((op) => (
@@ -205,11 +207,11 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
 
         <section aria-labelledby="sync-pending">
           <h3 id="sync-pending" className="label mb-2">
-            Waiting to sync ({pending.length})
+            {t("Waiting to sync ({0})", { 0: pending.length })}
           </h3>
           {pending.length === 0 ? (
             <p className="text-3 rounded-xl border border-dashed px-4 py-5 text-center text-sm">
-              Nothing waiting. Everything entered on this tablet has reached the server.
+              {t("Nothing waiting. Everything entered on this tablet has reached the server.")}
             </p>
           ) : (
             <ul className="divide-y rounded-xl border">
@@ -222,9 +224,9 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
                     </p>
                     <p className="text-3 text-xs">
                       {when(op.occurred_at)}
-                      {op.attempts ? ` · tried ${op.attempts}×` : ""}
+                      {op.attempts ? t(" · tried {0}×", { 0: op.attempts }) : ""}
                       {session && op.meta.user_id !== session.user_id
-                        ? ` · waiting for ${op.meta.user_name} to sign in`
+                        ? t(" · waiting for {0} to sign in", { 0: op.meta.user_name })
                         : ""}
                     </p>
                   </div>
@@ -237,11 +239,10 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
         {held.length ? (
           <section aria-labelledby="sync-held">
             <h3 id="sync-held" className="label mb-2">
-              Held for owner review ({held.length})
+              {t("Held for owner review ({0})", { 0: held.length })}
             </h3>
             <p className="text-2 mb-3 text-sm leading-relaxed">
-              These reached the server after their shift was locked. Nothing is lost — the owner
-              decides whether each one is written into that shift.
+              {t("These reached the server after their shift was locked. Nothing is lost — the owner decides whether each one is written into that shift.")}
             </p>
             <ul className="divide-y rounded-xl border">
               {held.map((item) => (
@@ -252,7 +253,7 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
         ) : null}
 
         {ops.length === 0 && held.length === 0 && !online ? (
-          <Empty title="Nothing saved on this tablet yet" hint="Entries made while offline will be listed here." />
+          <Empty title={t("Nothing saved on this tablet yet")} hint={t("Entries made while offline will be listed here.")} />
         ) : null}
       </div>
     </Sheet>
@@ -260,6 +261,7 @@ function SyncSheet({ onClose }: { onClose: () => void }) {
 }
 
 function RejectedRow({ op, onError }: { op: OutboxOp; onError: (message: string | null) => void }) {
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -288,7 +290,7 @@ function RejectedRow({ op, onError }: { op: OutboxOp; onError: (message: string 
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" className="h-11 px-4" disabled={busy} onClick={() => void act(() => retryRejected(op.client_ref))}>
-            Try again
+            {t("Try again")}
           </Button>
           <Button
             size="sm"
@@ -297,23 +299,24 @@ function RejectedRow({ op, onError }: { op: OutboxOp; onError: (message: string 
             disabled={busy}
             onClick={() => setConfirming(true)}
           >
-            Discard
+            {t("Discard")}
           </Button>
         </div>
       </div>
       {confirming ? (
-        <div role="alertdialog" aria-label="Confirm discard" className="surface-2 rise mt-3 rounded-xl border p-3">
-          <p className="text-sm font-semibold">Discard this {KIND_LABEL[op.kind].toLowerCase()}?</p>
+        <div role="alertdialog" aria-label={t("Confirm discard")} className="surface-2 rise mt-3 rounded-xl border p-3">
+          <p className="text-sm font-semibold">{t("Discard this {0}?", { 0: KIND_LABEL[op.kind].toLowerCase() })}</p>
           <p className="text-2 mt-1 text-xs leading-relaxed">
-            It is removed from this tablet and never reaches the server. If it really happened,
-            enter it again once the cause is fixed.
+            {t(
+              "It is removed from this tablet and never reaches the server. If it really happened, enter it again once the cause is fixed.",
+            )}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button size="lg" variant="stop" disabled={busy} onClick={() => void act(() => discard(op.client_ref))}>
-              Yes, discard
+              {t("Yes, discard")}
             </Button>
             <Button size="lg" variant="outline" onClick={() => setConfirming(false)}>
-              Keep it
+              {t("Keep it")}
             </Button>
           </div>
         </div>
@@ -323,9 +326,10 @@ function RejectedRow({ op, onError }: { op: OutboxOp; onError: (message: string 
 }
 
 function HeldRow({ item, onError }: { item: HeldLocal; onError: (message: string | null) => void }) {
+  const t = useT();
   return (
     <li className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <Badge variant="warn">Held</Badge>
+      <Badge variant="warn">{t("Held")}</Badge>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">
           {KIND_LABEL[item.kind]} <span className="text-2 font-normal">· {describe(item.meta)}</span>
@@ -341,7 +345,7 @@ function HeldRow({ item, onError }: { item: HeldLocal; onError: (message: string
         className="h-11 border px-4"
         onClick={() => dismissHeld(item.client_ref).catch((e: Error) => onError(e.message))}
       >
-        Dismiss
+        {t("Dismiss")}
       </Button>
     </li>
   );

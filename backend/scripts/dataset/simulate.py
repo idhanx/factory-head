@@ -57,6 +57,17 @@ from app.kernel import (
     schedule_adherence,
     scrap_cost,
 )
+from app.kernel.kaizen import (
+    PLUGIN_WEIGHTS,
+    STANDALONE_WEIGHTS,
+    PointsEvent,
+    SavingType,
+    ScoreInputs,
+    classify,
+    is_quick_win,
+    points_for,
+    priority_score,
+)
 from app.kernel.profit import WeeklyLoss
 from app.kernel.rules import ActionThresholds, CoachTier, DataSufficiency, EventForTrigger
 from app.kernel.types import (
@@ -70,13 +81,14 @@ from app.kernel.types import (
     PartEconomics,
     Recoverability,
 )
-from app.models import ClauseStatus
+from app.models import ClauseStatus, KaizenCategory
 from app.services.compliance import CLAUSE_LIBRARY, readiness_score
+from app.services.kaizen import DEFAULT_REASON_MAP
 from app.services.downtime import escalation_message
-from app.services.kaizen import SCOPED_SHARE, UNSCOPED_SHARE, match_reason
 from app.services.skills import COMPETENT, MIN_COVERAGE, MIN_GAP_EVENTS
 
 from . import texts
+from .kaizen_scoring import SCOPED_SHARE, UNSCOPED_SHARE, match_reason
 from .catalog import (
     BASE_EVENT_PROFILE,
     DEFECT_TAMIL,
@@ -89,7 +101,18 @@ from .catalog import (
 from .store import Store
 
 IST = timezone(timedelta(hours=5, minutes=30))
-HOLIDAYS = {date(2026, 8, 15)}  # Independence Day — plants closed
+# Tamil Nadu factory holidays in the simulated year. A plant that never closes
+# for Pongal is a plant nobody in Hosur will believe.
+HOLIDAYS = {
+    date(2026, 1, 1),  # New Year's Day
+    date(2026, 1, 14),  # Pongal
+    date(2026, 1, 15),  # Thiruvalluvar Day
+    date(2026, 1, 26),  # Republic Day
+    date(2026, 4, 14),  # Tamil New Year / Ambedkar Jayanti
+    date(2026, 5, 1),  # May Day
+    date(2026, 8, 15),  # Independence Day
+    date(2026, 9, 2),  # Vinayaka Chaturthi
+}
 ACTIVE_STATES = ("open", "root_cause", "planned", "in_progress")
 
 EXTRA_DURATIONS = {
@@ -99,6 +122,34 @@ EXTRA_DURATIONS = {
     "CMM_QUEUE": (10, 28),
     "HT_LOAD_WAIT": (10, 28),
     "WIP_STARVED": (8, 26),
+}
+
+# Which of §7.2's saving types a reason code's losses belong to, and which of
+# Step 3's waste categories the operator would confirm. The plugin's own
+# DEFAULT_REASON_MAP goes category -> reason codes; the simulation needs the
+# inverse, because it starts from the reason code the idea text matched.
+KAIZEN_SAVING_TYPE: dict[str | None, SavingType] = {
+    "TOOL_BREAKAGE": SavingType.TOOLING,
+    "MATERIAL_WAIT": SavingType.WAITING,
+    "SETUP_CHANGEOVER": SavingType.CHANGEOVER,
+    "MACHINE_BREAKDOWN": SavingType.WAITING,
+    "COOLANT_ISSUE": SavingType.CONSUMABLE,
+    "FIXTURE_ISSUE": SavingType.HANDLING,
+    "NO_OPERATOR": SavingType.WAITING,
+    "QUALITY_HOLD": SavingType.REWORK,
+    "PROGRAM_ISSUE": SavingType.CYCLE_TIME,
+}
+
+KAIZEN_CATEGORY: dict[str | None, KaizenCategory] = {
+    "TOOL_BREAKAGE": KaizenCategory.MAINTENANCE,
+    "MATERIAL_WAIT": KaizenCategory.WAITING,
+    "SETUP_CHANGEOVER": KaizenCategory.PRODUCTIVITY,
+    "MACHINE_BREAKDOWN": KaizenCategory.MAINTENANCE,
+    "COOLANT_ISSUE": KaizenCategory.MAINTENANCE,
+    "FIXTURE_ISSUE": KaizenCategory.MAINTENANCE,
+    "NO_OPERATOR": KaizenCategory.WAITING,
+    "QUALITY_HOLD": KaizenCategory.QUALITY,
+    "PROGRAM_ISSUE": KaizenCategory.PRODUCTIVITY,
 }
 
 REJECT_BASE = [
@@ -456,6 +507,8 @@ class PlantSim:
         self.reasons: dict[str, SimpleNamespace] = {}
         self.defects_by_family: dict[str | None, list[str]] = defaultdict(list)
         self.defect_labels: dict[str, str] = {}
+        self.defect_rows: dict[str, dict] = {}
+        self._patterns_seen: set[tuple] = set()
         self.shifts: list[SimpleNamespace] = []
         self.operators: list[SimpleNamespace] = []
         self.skills: dict[tuple, dict] = {}
@@ -486,6 +539,11 @@ class PlantSim:
         self.kaizen_seq = 0
         self.kaizen_rows: list[dict] = []
         self.kaizen_decisions: dict[str, tuple] = {}
+        self._rank_cache: dict[date, dict[str, int]] = {}
+        self._points_awarded: set[tuple[str, str]] = set()
+        self.kaizen_cost_reference = 0
+        self.kaizen_freq_reference = 0
+        self.kaizen_saving_reference = 0
         self.session_part: dict = {}
         self.clause_rows: list[dict] = []
         self.snapshot_cache: dict[tuple, CostSnapshot] = {}
@@ -510,6 +568,8 @@ class PlantSim:
         self._targets()
         self._forms_and_uploads()
         self._historical_memory()
+        self._kaizen_config()
+        self._push_subscriptions()
         self._simulate()
         self._finalise()
 
@@ -1052,7 +1112,7 @@ class PlantSim:
         for order, (code, label, family, tamil_key) in enumerate(
             self.spec.defects, start=1
         ):
-            self.s.add(
+            row = self.s.add(
                 "defect_codes",
                 at=self.onboard_at,
                 plant_id=self.pid,
@@ -1065,6 +1125,7 @@ class PlantSim:
             )
             self.defects_by_family[family].append(code)
             self.defect_labels[code] = label
+            self.defect_rows[code] = row
 
     def _shifts(self) -> None:
         for index, sh in enumerate(self.spec.shifts, start=1):
@@ -1618,6 +1679,8 @@ class PlantSim:
             self._advance_actions(day)
             self._worker(day)
             self._kaizen(day)
+            self._kaizen_patterns(day)
+            self._material_staging(day)
             self._manual_actions(day)
             self._copilot(day)
             self._periodic(day)
@@ -1994,6 +2057,7 @@ class PlantSim:
             closed_by_id=supervisor[1]["id"],
             updated_at=closed_at,
         )
+        self._sync_hold(ctx)
         if rng.random() < 0.02:
             reason = rng.choice(
                 [
@@ -2686,7 +2750,40 @@ class PlantSim:
                     acknowledged_at=ack,
                     **base,
                 )
+                # The escalation is the rung; this is the message that carried
+                # it. services.notifications writes one per delivery attempt.
+                self._notification(
+                    kind="escalation",
+                    channel=channel,
+                    at_time=due,
+                    body=message,
+                    recipient=recipient,
+                    title=f"{event.station.code} stopped",
+                    status="failed" if failed else "sent",
+                    subject_type="downtime_event",
+                    subject_id=event.row["id"],
+                    dedupe=f"L{lvl}",
+                    template="stop_escalation" if channel != "push" else None,
+                    url=f"/floor?station={event.station.code}",
+                    error=(
+                        "Session expired: template not approved for this number"
+                        if failed
+                        else None
+                    ),
+                )
                 if failed:
+                    self._notification(
+                        kind="escalation",
+                        channel="sms",
+                        at_time=sent + timedelta(seconds=30),
+                        body=message,
+                        recipient=recipient,
+                        title=f"{event.station.code} stopped",
+                        subject_type="downtime_event",
+                        subject_id=event.row["id"],
+                        dedupe=f"L{lvl}-sms-fallback",
+                        template="stop_escalation_sms",
+                    )
                     self.s.add(
                         "escalations",
                         at=sent + timedelta(seconds=30),
@@ -2828,6 +2925,16 @@ class PlantSim:
             "quantity": cost.quantity,
         }
         self.quality_rows.append(row)
+        # An inspector photographs what they scrapped far more often than what
+        # they passed — the photo is the evidence behind a disputed rejection.
+        if (reject or rework) and rng.random() < 0.38:
+            self._attachment(
+                entity_type="quality_record",
+                entity_id=row["id"],
+                at_time=recorded,
+                user_id=ctx.inspector[1]["id"],
+                kind="reject",
+            )
 
     def _summary(self, ctx, actions_created: int) -> dict:
         """The frozen KPI snapshot written at close.
@@ -3336,7 +3443,12 @@ class PlantSim:
         plan.closures += 1
         plan.last_week_count = -1
         if plan.kaizen is not None:
-            plan.kaizen.update(status="implemented", updated_at=moment)
+            plan.kaizen.update(
+                status="implemented", implemented_at=moment, updated_at=moment
+            )
+            self._award_points(plan.kaizen, "implemented", day)
+            if plan.kaizen["safety_flagged"]:
+                self._award_points(plan.kaizen, "safety_implemented", day)
         if plan.need is not None:
             plan.need.update(resolved=True, updated_at=moment)
             trainee = next(
@@ -3478,6 +3590,17 @@ class PlantSim:
             )
             if result.sustained and row["state"] == "monitoring":
                 row.update(state="verified", verified_at=run_at)
+                # §9 — the rupee is counted once, in Core's ledger. This is the
+                # attributed copy for the operator's credit, never added to the
+                # plant total a second time.
+                if plan.kaizen is not None and plan.kaizen["status"] != "verified":
+                    plan.kaizen.update(
+                        status="verified",
+                        verified_saving_paise=result.recovered,
+                        verified_at=run_at,
+                        updated_at=run_at,
+                    )
+                    self._award_points(plan.kaizen, "verified", run_at.date())
 
     def _manual_actions(self, day: date) -> None:
         rng = self.rng
@@ -3770,6 +3893,21 @@ class PlantSim:
                 delivered_at=delivered + timedelta(seconds=rng.randint(1, 50)),
                 opened_at=opened if opened and opened <= self.now else None,
             )
+            # The briefing is the content; this is the 05:45 push that carried
+            # it to the phone (§14.6).
+            if tier is not CoachTier.SILENT:
+                self._notification(
+                    kind="coach_briefing",
+                    channel="push",
+                    at_time=delivered,
+                    body=text[:400],
+                    recipient=None,
+                    user_id=user["id"],
+                    title="Your shift briefing",
+                    subject_type="coach_briefing",
+                    subject_id=None,
+                    url="/coach",
+                )
 
     @staticmethod
     def _classify(text: str) -> str:
@@ -3980,6 +4118,14 @@ class PlantSim:
     # ======================================================================
 
     def _kaizen(self, day: date) -> None:
+        """One operator's 30 seconds, through the v2 journey (§5.1-§11).
+
+        The plugin never invents money: ``core_value_paise`` is what this
+        plant's own downtime cost for the matched reason code annualises to,
+        and :func:`app.kernel.kaizen.classify` splits it into cash and released
+        capacity on the station's bottleneck factor. Everything the operator is
+        shown — verdict, quick-win flag, points — comes from the kernel.
+        """
         rng = self.rng
         if (
             day < self.spec.go_live + timedelta(days=5)
@@ -4008,12 +4154,19 @@ class PlantSim:
             )
             st = self.stations.get(named) if named else None
         reason_code = match_reason(title, description)
+
+        # --- Step 5A: the Core History Check ------------------------------
+        # Exactly the query §6.1 describes, re-expressed over the simulated
+        # rows: this reason code, on this station, over the plant's window.
+        window = 90
         observed = occurrences = 0
+        recent_half = prior_half = 0
         scope = "the plant"
-        since = day - timedelta(days=90)
+        since = day - timedelta(days=window)
         if reason_code:
-            for offset in range(91):
-                for event in self.events_by_date.get(since + timedelta(days=offset), []):
+            for offset in range(window + 1):
+                at_date = since + timedelta(days=offset)
+                for event in self.events_by_date.get(at_date, []):
                     if (
                         event.reason.code == reason_code
                         and event.reason.rs == "R"
@@ -4021,25 +4174,70 @@ class PlantSim:
                     ):
                         observed += event.row["cost_total"]
                         occurrences += 1
+                        if offset >= window // 2:
+                            recent_half += 1
+                        else:
+                            prior_half += 1
             if st:
                 scope = st.code
+
         share = SCOPED_SHARE if st else UNSCOPED_SHARE
-        annualised = int(observed * (365 / 90)) if observed else 0
-        saving = int(annualised * share)
-        impact = (
-            5
-            if saving >= 50_00_000
-            else 4
-            if saving >= 10_00_000
-            else 3
-            if saving >= 2_00_000
-            else 2
-            if saving > 0
-            else 1
+        annualised = int(observed * (365 / window)) if observed else 0
+        core_value = int(annualised * share)
+
+        # --- Step 7: what kind of saving, and whose money ------------------
+        saving_type = KAIZEN_SAVING_TYPE.get(reason_code, SavingType.OTHER)
+        split = classify(
+            saving_type=saving_type,
+            core_value=core_value,
+            bottleneck_factor=st.bf if st else Decimal(0),
         )
+        category = KAIZEN_CATEGORY.get(reason_code, KaizenCategory.OTHER)
+        track = "quick" if rng.random() < 0.34 else "full"
+        safety_flagged = category is KaizenCategory.SAFETY or rng.random() < 0.06
+        stars = {
+            "safety": 4 if safety_flagged else rng.randint(0, 2),
+            "quality": 3 if category is KaizenCategory.QUALITY else rng.randint(0, 2),
+            "delivery": rng.randint(0, 3),
+            "morale": rng.randint(0, 3),
+            "compliance": rng.randint(0, 2),
+        }
+        # Effort is a genuine unknown at submission. Start in the middle and let
+        # whoever reviews it adjust — guessing precisely would be false comfort.
+        ease = 3
+        investment = (
+            0
+            if track == "quick"
+            else rng.choice([0, 0, 50_000, 150_000, 400_000, 1_200_000, 3_500_000])
+        )
+
+        # --- Step 11: the hidden score and the verdict the operator sees ---
+        ranked = self._recurring_rank(day, window)
+        plant_rank = ranked.get(reason_code) if reason_code else None
+        priced = priority_score(
+            ScoreInputs(
+                verified_cost=observed,
+                verified_events=occurrences,
+                events_recent_half=recent_half,
+                events_prior_half=prior_half,
+                hard_saving=split.hard,
+                ease=ease,
+                safety_stars=stars["safety"],
+                quality_stars=stars["quality"],
+                compliance_stars=stars["compliance"],
+                cost_reference=max(self.kaizen_cost_reference, 1),
+                frequency_reference=max(self.kaizen_freq_reference, 1),
+                saving_reference=max(self.kaizen_saving_reference, 1),
+                plant_rank=plant_rank,
+            ),
+            PLUGIN_WEIGHTS if occurrences else STANDALONE_WEIGHTS,
+        )
+
         if reason_code and occurrences:
             rationale = (
-                f"Matched to '{reason_code.replace('_', ' ').title()}' on {scope}: {occurrences} events costing {format_inr(observed)} in the last 90 days. Annualised that is {format_inr(annualised)}; the "
+                f"Matched to '{reason_code.replace('_', ' ').title()}' on {scope}: "
+                f"{occurrences} events costing {format_inr(observed)} in the last "
+                f"{window} days. Annualised that is {format_inr(annualised)}; the "
                 + (
                     "estimate credits a quarter of it, because ideas usually reduce a loss rather than remove it."
                     if st
@@ -4047,45 +4245,169 @@ class PlantSim:
                 )
             )
         elif reason_code:
-            rationale = f"Matched to '{reason_code.replace('_', ' ').title()}', but no losses recorded against it in the last 90 days — so there is no measured saving to claim yet."
+            rationale = (
+                f"Matched to '{reason_code.replace('_', ' ').title()}', but no losses "
+                f"recorded against it in the last {window} days — so there is no "
+                "measured saving to claim yet."
+            )
         else:
-            rationale = "No downtime reason matched this idea, so it carries no estimated saving. Worth reviewing on its merits — safety, effort and quality improvements are real even when the system cannot price them."
+            rationale = (
+                "No downtime reason matched this idea, so it carries no estimated "
+                "saving. Worth reviewing on its merits — safety, effort and quality "
+                "improvements are real even when the system cannot price them."
+            )
+
         self.kaizen_seq += 1
         reason = self.reasons.get(reason_code) if reason_code else None
+        language = "ta" if rng.random() < 0.55 else "en"
         idea = self.s.add(
             "kaizen_ideas",
             at=submitted,
             plant_id=self.pid,
             reference=f"KZN-{self.kaizen_seq:04d}",
+            track=track,
             title=title,
             description=description,
+            voice_transcript=description if rng.random() < 0.7 else None,
+            voice_language=language,
             submitted_by_name=operator.name,
-            submitted_by_operator_id=operator.id,
+            submitted_by_user_id=None,
+            credited_operator_id=operator.id,
+            credited_name=operator.name,
+            board="shopfloor",
+            department=st.section if st else None,
+            submitted_on=day,
             station_id=st.id if st else None,
+            part_id=None,
             reason_code_id=reason.id if reason else None,
-            status="scored",
-            estimated_annual_saving=saving,
-            effort_score=3,
-            impact_score=impact,
+            context_confirmed=True,
+            category=category.value,
+            saving_type=saving_type.value if core_value else None,
+            vision_ran=track == "full" and rng.random() < 0.4,
+            interview=None,
+            history={
+                "window_days": window,
+                "reason_code": reason_code,
+                "scope": scope,
+                "events": occurrences,
+                "observed_paise": observed,
+                "annualised_paise": annualised,
+            }
+            if reason_code
+            else None,
+            core_value_paise=split.core_value,
+            hard_saving_paise=split.hard,
+            soft_saving_paise=split.soft,
+            saving_basis=split.basis,
+            intangible_stars=stars,
+            investment_paise=investment,
+            investment_is_estimate=True,
+            needs_shutdown=track == "full" and rng.random() < 0.12,
+            effort_score=ease,
+            impact_score=(
+                5
+                if split.hard >= 50_00_000
+                else 4
+                if split.hard >= 10_00_000
+                else 3
+                if split.hard >= 2_00_000
+                else 2
+                if split.hard > 0
+                else 1
+            ),
+            priority_score=priced.score,
+            priority_verdict=priced.verdict,
+            score_components={k: str(v) for k, v in priced.components.items()},
             score_rationale=rationale,
             linked_loss_paise=observed,
+            safety_flagged=safety_flagged,
+            status="scored",
+            approval_step=0,
+            approval_route=["supervisor"] if track == "full" else None,
             action_id=None,
             decided_at=None,
             decision_note=None,
+            points_awarded=0,
         )
         self.kaizen_rows.append(idea)
+        # Step 1 is a voice note and one photo. Vision only ran where there is
+        # a photo to run it on.
+        if idea["vision_ran"] or rng.random() < 0.55:
+            self._attachment(
+                entity_type="kaizen_idea",
+                entity_id=idea["id"],
+                at_time=submitted,
+                user_id=None,
+                kind="kaizen",
+            )
+        self._award_points(idea, "submitted", day)
         decide = next_working_day(day, rng.randint(2, 8))
         roll = rng.random()
         self.kaizen_decisions[idea["reference"]] = (
             decide,
             "accept"
-            if (roll < 0.42 and saving > 0) or roll < 0.15
+            if (roll < 0.42 and split.hard > 0) or roll < 0.15
             else "reject"
             if roll < 0.62
             else None,
             st,
             reason,
         )
+
+    def _recurring_rank(self, day: date, window: int) -> dict[str, int]:
+        """The plant's recurring losses, biggest first — §11.2's rank.
+
+        Cached per day: every idea submitted on the same day sees the same
+        ranking, which is what the service would do with one query.
+        """
+        cached = self._rank_cache.get(day)
+        if cached is not None:
+            return cached
+        totals: dict[str, int] = defaultdict(int)
+        counts: dict[str, int] = defaultdict(int)
+        since = day - timedelta(days=window)
+        for offset in range(window + 1):
+            for event in self.events_by_date.get(since + timedelta(days=offset), []):
+                if event.reason.rs != "R":
+                    continue
+                totals[event.reason.code] += event.row["cost_total"]
+                counts[event.reason.code] += 1
+        order = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+        ranks = {code: index for index, (code, _) in enumerate(order, start=1)}
+        # The plant's own yardsticks: the biggest recurring loss and the most
+        # frequent one are what every other idea is normalised against (§11).
+        self.kaizen_cost_reference = order[0][1] if order else 0
+        self.kaizen_freq_reference = max(counts.values(), default=0)
+        self.kaizen_saving_reference = int(
+            (order[0][1] if order else 0) * (365 / window) * SCOPED_SHARE
+        )
+        self._rank_cache = {day: ranks}
+        return ranks
+
+    def _award_points(self, idea: dict, kind: str, on: date, note: str | None = None) -> int:
+        """``services.kaizen.award`` — idempotent per idea per outcome."""
+        key = (idea["reference"], kind)
+        if key in self._points_awarded:
+            return 0
+        self._points_awarded.add(key)
+        points = points_for(
+            PointsEvent(kind), verified_annual_saving=idea["verified_saving_paise"] or 0
+        )
+        self.s.add(
+            "kaizen_points",
+            at=at(on, "18:30"),
+            plant_id=self.pid,
+            idea_id=idea["id"],
+            operator_id=idea["credited_operator_id"],
+            person_name=idea["credited_name"],
+            board=idea["board"],
+            kind=kind,
+            points=points,
+            awarded_on=on,
+            note=note,
+        )
+        idea["points_awarded"] = (idea["points_awarded"] or 0) + points
+        return points
 
     def _kaizen_decisions(self, day: date) -> None:
         rng = self.rng
@@ -4097,14 +4419,61 @@ class PlantSim:
             if when > self.now:
                 continue
             _, verdict, st, reason = self.kaizen_decisions.pop(idea["reference"])
+            trail = list(idea["approval_trail"] or [])
             if verdict == "reject":
+                trail.append(
+                    {
+                        "step": 0,
+                        "role": "supervisor",
+                        "by": self.head_person.name,
+                        "decision": "rejected",
+                        "at": when.isoformat(),
+                    }
+                )
                 idea.update(
                     status="rejected",
                     decided_at=when,
                     decision_note=rng.choice(texts.KAIZEN_REJECT_NOTES),
                     effort_score=rng.randint(3, 5),
+                    approval_trail=trail,
                     updated_at=when,
                 )
+                continue
+            trail.append(
+                {
+                    "step": 0,
+                    "role": "supervisor",
+                    "by": self.head_person.name,
+                    "decision": "approved",
+                    "at": when.isoformat(),
+                }
+            )
+            idea["approval_trail"] = trail
+            self._award_points(idea, "approved", day)
+            # §4.3 — an approved Kaizen becomes a Core Action only above Core's
+            # own threshold, or when safety-flagged. Below it, the supervisor
+            # just does it: "approved" without an Action of its own.
+            if (
+                idea["hard_saving_paise"] < self.spec.action_cost_threshold * 100
+                and not idea["safety_flagged"]
+            ):
+                idea.update(
+                    status="approved",
+                    decided_at=when,
+                    decision_note="Below the Action threshold — do it on the shift.",
+                    effort_score=rng.randint(1, 4),
+                    updated_at=when,
+                )
+                done = next_working_day(day, rng.randint(1, 6))
+                if at(done, "16:00") <= self.now:
+                    idea.update(
+                        status="implemented",
+                        implemented_at=at(done, "16:00"),
+                        updated_at=at(done, "16:00"),
+                    )
+                    self._award_points(idea, "implemented", done)
+                    if idea["safety_flagged"]:
+                        self._award_points(idea, "safety_implemented", done)
                 continue
             plan = self._create_action(
                 when=when,
@@ -4120,6 +4489,7 @@ class PlantSim:
                 due=day + timedelta(days=14),
             )
             plan.kaizen = idea
+            effort = rng.randint(1, 4)
             idea.update(
                 status="accepted",
                 action_id=plan.action["id"],
@@ -4131,8 +4501,427 @@ class PlantSim:
                         "Approved; maintenance to support.",
                     ]
                 ),
-                effort_score=rng.randint(1, 4),
+                effort_score=effort,
                 updated_at=when,
+            )
+            # §13.2's Quick Wins filter, decided by the kernel, not by a guess.
+            if is_quick_win(
+                score=idea["priority_score"],
+                investment=idea["investment_paise"],
+                needs_shutdown=idea["needs_shutdown"],
+                threshold=1_000_000,
+            ):
+                idea["signals"] = sorted({*(idea["signals"] or []), "quick_win"})
+
+    # ======================================================================
+    # Delivery, evidence and the offline edge
+    #
+    # These are the tables a screen reads but no shift writes directly: the
+    # notification behind an escalation, the photo behind a rejection, the
+    # entry a tablet could not send until after the shift locked.
+    # ======================================================================
+
+    def _kaizen_config(self) -> None:
+        """K4 and K5 — the plugin's whole configuration surface (§2.1).
+
+        Seeded rather than required: a plugin that will not run until somebody
+        fills a setup screen does not get switched on in week one.
+        """
+        spec = self.spec
+        # A bigger plant routes through more people; a two-shift job shop does
+        # not need three approvals to move a ₹4,000 idea.
+        template, steps = (
+            ("standard", ["supervisor", "plant_head", "owner"])
+            if len(spec.people) >= 8
+            else ("simple", ["supervisor"])
+        )
+        self.kaizen_settings = self.s.add(
+            "kaizen_settings",
+            at=self.onboard_at,
+            plant_id=self.pid,
+            template=template,
+            steps=steps,
+            auto_approve_below_paise=500_000,
+            auto_approve_min_score=80,
+            safety_always_to_owner=True,
+            finance_above_paise=2_500_000,
+            history_window_days=180,
+            score_weights=None,
+            pattern_min_items=5,
+            pattern_min_value_paise=5_000_000,
+            patterns_include_quick=True,
+            promote_above_paise=2_000_000,
+            monthly_minimum=1,
+            quick_win_investment_paise=1_000_000,
+            enabled_categories=[c.value for c in KaizenCategory],
+        )
+
+        # §6.1 — category ↔ Core code, built from the plant's own T6 library.
+        # Where a category has no matching code the row is still written with a
+        # NULL code: the screen must show the category, never nothing.
+        for category, codes in DEFAULT_REASON_MAP.items():
+            matched = [self.reasons[c] for c in codes if c in self.reasons]
+            for reason in matched or [None]:
+                self.s.add(
+                    "kaizen_category_codes",
+                    at=self.onboard_at,
+                    plant_id=self.pid,
+                    category=category.value,
+                    reason_code_id=reason.id if reason else None,
+                    defect_code_id=None,
+                )
+        # Quality also maps to the defect codes an inspector actually picks.
+        for code in list(self.defect_labels)[:4]:
+            self.s.add(
+                "kaizen_category_codes",
+                at=self.onboard_at,
+                plant_id=self.pid,
+                category=KaizenCategory.QUALITY.value,
+                reason_code_id=None,
+                defect_code_id=self.defect_rows[code]["id"],
+            )
+
+    def _push_subscriptions(self) -> None:
+        """One row per device that accepted notifications (§14.5).
+
+        Floor roles run the PWA on a shared shop tablet; the owner is on a
+        phone. A failed endpoint is kept with its failure count rather than
+        deleted, because that is what the worker does before it gives up.
+        """
+        rng = self.rng
+        agents = [
+            "Mozilla/5.0 (Linux; Android 13; RMX3363) Chrome/120.0.0.0 Mobile",
+            "Mozilla/5.0 (Linux; Android 12; SM-A325F) Chrome/119.0.0.0 Mobile",
+            "Mozilla/5.0 (Linux; Android 11; Nokia T20) Chrome/118.0.0.0 Safari",
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2) Safari/605.1.15",
+            "Mozilla/5.0 (X11; Linux x86_64) Chrome/121.0.0.0 Safari/537.36",
+        ]
+        for person in self.spec.people:
+            user = self.person_user[person.name]
+            for _ in range(1 if person.role_tag == "owner" else rng.randint(1, 2)):
+                failures = rng.choice([0, 0, 0, 0, 1, 3])
+                subscribed = at(
+                    self.spec.go_live + timedelta(days=rng.randint(0, 9)), "09:40"
+                )
+                if subscribed > self.now:
+                    subscribed = self.now - timedelta(days=1)
+                self.s.add(
+                    "push_subscriptions",
+                    at=subscribed,
+                    plant_id=self.pid,
+                    user_id=user["id"],
+                    endpoint=(
+                        "https://fcm.googleapis.com/fcm/send/"
+                        f"{self.s.uuid().hex}{self.s.uuid().hex[:24]}"
+                    ),
+                    p256dh=self.s.uuid().hex + self.s.uuid().hex[:22],
+                    auth=self.s.uuid().hex[:22],
+                    user_agent=rng.choice(agents),
+                    failures=failures,
+                    last_success_at=(
+                        None
+                        if failures >= 3
+                        else self.now - timedelta(hours=rng.randint(1, 96))
+                    ),
+                )
+
+    def _notification(
+        self,
+        *,
+        kind: str,
+        channel: str,
+        at_time: datetime,
+        body: str,
+        recipient: dict | None,
+        user_id=None,
+        title: str | None = None,
+        status: str = "sent",
+        subject_type: str | None = None,
+        subject_id=None,
+        dedupe: str | None = None,
+        template: str | None = None,
+        url: str | None = None,
+        error: str | None = None,
+    ) -> dict:
+        """One delivery record, as ``services.notifications.queue`` writes it."""
+        rng = self.rng
+        sent = at_time + timedelta(seconds=rng.randint(1, 25))
+        if sent > self.now:
+            sent = self.now
+        return self.s.add(
+            "notifications",
+            at=at_time,
+            plant_id=self.pid,
+            kind=kind,
+            channel=channel,
+            status=status,
+            recipient_name=recipient["name"] if recipient else None,
+            recipient_number=recipient["whatsapp_number"] if recipient else None,
+            user_id=user_id or (recipient["user_id"] if recipient else None),
+            title=title,
+            body=body,
+            url=url,
+            template=template,
+            variables=None,
+            subject_type=subject_type,
+            subject_id=subject_id,
+            # services.notifications keys on subject + recipient + channel, so
+            # the same stop can escalate to three people without deduping away.
+            dedupe_key=(
+                f"{subject_type}:{subject_id}:{dedupe}:{channel}"
+                if subject_id is not None and dedupe
+                else None
+            ),
+            attempts=1 if status != "failed" else 2,
+            next_attempt_at=None,
+            last_error=error,
+            provider_message_id=(
+                None if status == "failed" else self.s.uuid().hex[:24]
+            ),
+            provider_response=(
+                {"result": True, "info": "Queued"}
+                if status == "sent"
+                else {"result": False, "info": error}
+            ),
+            sent_at=None if status != "sent" else sent,
+        )
+
+    def _attachment(
+        self, *, entity_type: str, entity_id, at_time: datetime, user_id, kind: str
+    ) -> None:
+        """A photo taken on the floor (§14.5). Stored by sha, served by key."""
+        rng = self.rng
+        width, height = rng.choice([(1080, 1440), (1440, 1080), (2048, 1536), (960, 1280)])
+        sha = f"{self.s.uuid().hex}{self.s.uuid().hex}"[:64]
+        self.s.add(
+            "attachments",
+            at=at_time,
+            plant_id=self.pid,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            filename=f"{kind}-{at_time:%Y%m%d-%H%M%S}.jpg",
+            content_type="image/jpeg",
+            size_bytes=rng.randint(180_000, 3_400_000),
+            width=width,
+            height=height,
+            sha256=sha,
+            storage_key=f"{self.spec.code.lower()}/{at_time:%Y/%m}/{sha[:16]}.jpg",
+            uploaded_by_id=user_id,
+        )
+
+    def _material_staging(self, day: date) -> None:
+        """Stores stages tomorrow's jobs today (Screen: Stores).
+
+        The interesting rows are the short ones: staged less than the job
+        needs, which is what a Material Wait stop looks like before it happens.
+        """
+        rng = self.rng
+        stores = self.recipients.get("stores")
+        stores_user = stores[0]["user_id"] if stores else None
+        running = [
+            job
+            for job in self.jobs
+            if job.row["status"] in ("running", "planned")
+            and job.row["opened_at"].date() <= day
+        ]
+        if not running:
+            return
+        for job in rng.sample(running, k=min(len(running), rng.randint(1, 3))):
+            required = job.row["planned_quantity"]
+            roll = rng.random()
+            if roll < 0.14:
+                status, staged = "pending", None
+                confirmed_at, confirmed_by = None, None
+            elif roll < 0.27:
+                status = "short"
+                staged = int(required * rng.uniform(0.35, 0.85))
+                confirmed_at = at(day, f"{rng.randint(6, 9):02d}:{rng.randint(0, 59):02d}")
+                confirmed_by = stores_user
+            else:
+                status, staged = "staged", required
+                confirmed_at = at(day, f"{rng.randint(6, 9):02d}:{rng.randint(0, 59):02d}")
+                confirmed_by = stores_user
+            if confirmed_at is not None and confirmed_at > self.now:
+                return
+            self.s.add(
+                "material_stagings",
+                at=at(day, "06:10"),
+                plant_id=self.pid,
+                job_order_id=job.row["id"],
+                business_date=day,
+                status=status,
+                quantity_required=required,
+                quantity_staged=staged,
+                note=(
+                    rng.choice(
+                        [
+                            "Short — balance coil arriving tomorrow.",
+                            "Partial issue against the indent; stores chasing purchase.",
+                            "Material short against plan; supervisor informed.",
+                        ]
+                    )
+                    if status == "short"
+                    else None
+                ),
+                confirmed_by_id=confirmed_by,
+                confirmed_at=confirmed_at,
+            )
+
+    def _sync_hold(self, ctx) -> None:
+        """An offline tablet that reconnected after the shift locked (§14.1).
+
+        The entry is never silently dropped and never silently applied: it is
+        held with the reason it could not be written, and a supervisor decides.
+        Most turn out to be genuine and get applied.
+        """
+        rng = self.rng
+        if not ctx.events or rng.random() > 0.06:
+            return
+        locked_at = ctx.row["locked_at"]
+        if locked_at is None:
+            return
+        # ctx.events is one (station, sessions, stops, perf) tuple per station.
+        station, _sessions, stops, _perf = rng.choice(ctx.events)
+        if not stops:
+            return
+        # Stops are plain dicts at this point: {reason (code or None), start, end}.
+        stop = rng.choice(stops)
+        reason = self.reasons.get(stop["reason"]) if stop["reason"] else None
+        arrived = locked_at + timedelta(minutes=rng.randint(4, 220))
+        if arrived > self.now:
+            return
+        kind, payload = rng.choice(
+            [
+                (
+                    "downtime_start",
+                    {
+                        "station_id": str(station.id),
+                        "reason_code_id": str(reason.id) if reason else None,
+                        "note": "Entered on the tablet while the shed had no signal.",
+                    },
+                ),
+                (
+                    "production",
+                    {"station_id": str(station.id), "count": rng.randint(18, 240)},
+                ),
+            ]
+        )
+        supervisor_user = ctx.supervisor[1]
+        roll = rng.random()
+        status, resolved_at, resolution = "held", None, None
+        if roll < 0.62:
+            status = "applied"
+            resolution = "Genuine entry from the tablet — applied with an owner override."
+        elif roll < 0.78:
+            status = "discarded"
+            resolution = "Already keyed in by the next shift; discarded as a duplicate."
+        if status != "held":
+            resolved_at = arrived + timedelta(hours=rng.randint(1, 30))
+            if resolved_at > self.now:
+                status, resolved_at, resolution = "held", None, None
+        self.s.add(
+            "sync_holds",
+            at=arrived,
+            plant_id=self.pid,
+            client_ref=f"{self.spec.code.lower()}-{self.s.uuid().hex[:16]}",
+            device_id=f"tab-{self.spec.code.lower()}-{rng.randint(1, 6):02d}",
+            kind=kind,
+            shift_session_id=ctx.row["id"],
+            business_date=ctx.day,
+            occurred_at=stop["start"],
+            payload=payload,
+            reason=(
+                f"{ctx.sh.name} on {ctx.day.isoformat()} was locked at "
+                f"{locked_at:%H:%M} — this entry arrived afterwards."
+            ),
+            submitted_by_id=supervisor_user["id"],
+            status=status,
+            resolution_note=resolution,
+            resolved_by_id=supervisor_user["id"] if status != "held" else None,
+            resolved_at=resolved_at,
+            entity_id=None,
+        )
+
+    def _kaizen_patterns(self, day: date) -> None:
+        """§10 — the same problem said five different ways.
+
+        One operator's idea is a suggestion; five operators independently
+        naming the same machine and the same loss is a finding, and it is
+        worth more than any one of them. Runs monthly, like the service.
+        """
+        rng = self.rng
+        if day.day != 1 or day < self.spec.go_live + timedelta(days=45):
+            return
+        settings = self.kaizen_settings
+        window = day - timedelta(days=120)
+        clusters: dict[tuple, list[dict]] = defaultdict(list)
+        for idea in self.kaizen_rows:
+            if idea["submitted_on"] is None or idea["submitted_on"] < window:
+                continue
+            if idea["track"] == "quick" and not settings["patterns_include_quick"]:
+                continue
+            if idea["reason_code_id"] is None:
+                continue
+            clusters[idea["reason_code_id"]].append(idea)
+
+        for reason_id, ideas in clusters.items():
+            if len(ideas) < settings["pattern_min_items"]:
+                continue
+            reason = next(
+                (r for r in self.reasons.values() if r.id == reason_id), None
+            )
+            if reason is None:
+                continue
+            # A pattern is named after one machine only when the ideas really do
+            # point at one; otherwise it is a plant-wide finding.
+            station_ids = [i["station_id"] for i in ideas if i["station_id"]]
+            station = None
+            if station_ids:
+                common = max(set(station_ids), key=station_ids.count)
+                if station_ids.count(common) >= max(3, len(ideas) * 0.6):
+                    station = next(
+                        (s for s in self.stations.values() if s.id == common), None
+                    )
+            events = [
+                e
+                for offset in range((day - window).days + 1)
+                for e in self.events_by_date.get(window + timedelta(days=offset), [])
+                if e.reason.code == reason.code
+                and (station is None or e.station is station)
+            ]
+            cost = sum(e.row["cost_total"] for e in events)
+            if cost < settings["pattern_min_value_paise"]:
+                continue
+            key = (reason.code, station.code if station else None)
+            if key in self._patterns_seen:
+                continue
+            self._patterns_seen.add(key)
+            where = station.code if station else "several machines"
+            self.s.add(
+                "kaizen_patterns",
+                at=at(day, "07:00"),
+                plant_id=self.pid,
+                label=f"{reason.label} on {where}",
+                signature=[reason.code] + ([station.code] if station else []),
+                idea_ids=[i["id"] for i in ideas],
+                downtime_event_ids=[e.row["id"] for e in events[:200]],
+                departments=sorted(
+                    {i["department"] for i in ideas if i["department"]}
+                )
+                or None,
+                kaizen_count=len(ideas),
+                event_count=len(events),
+                verified_cost_paise=cost,
+                lost_minutes=int(sum(e.row["duration_minutes"] or 0 for e in events)),
+                recommendation=(
+                    f"{len(ideas)} operators have independently raised "
+                    f"'{reason.label}' on {where}. Core recorded {len(events)} "
+                    f"events costing {format_inr(cost)} over the same 120 days. "
+                    "Treat this as one problem with one owner, not five ideas."
+                ),
+                action_id=None,
+                dismissed=rng.random() < 0.12,
+                detected_on=day,
             )
 
     def _periodic(self, day: date) -> None:

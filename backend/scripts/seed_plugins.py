@@ -203,23 +203,50 @@ async def _kaizen(session, plant: Plant) -> int:
     if already:
         return int(already)
 
+    # The plugin needs its category-to-reason-code map before the History Check
+    # can find anything — the same fifteen minutes a consultant spends at
+    # onboarding, done here from Core's own T6 codes.
+    await kaizen_service.settings_for(session, plant=plant)
+
     stations = {
         s.code: s
         for s in (
             await session.scalars(select(Station).where(Station.plant_id == plant.id))
         ).all()
     }
+    # Core issues no operator logins at launch, so month one runs on
+    # submit-on-behalf: a supervisor files it, the named operator gets the
+    # points, the credit and the participation count.
+    operators = {
+        o.name: o
+        for o in (
+            await session.scalars(select(Operator).where(Operator.plant_id == plant.id))
+        ).all()
+    }
 
     ideas: list[KaizenIdea] = []
     for name, station_code, title, description in KAIZEN_IDEAS:
         station = stations.get(station_code) if station_code else None
+        operator = operators.get(name)
         idea = await kaizen_service.submit(
             session,
             plant=plant,
-            title=title,
-            description=description,
+            submission=kaizen_service.Submission(
+                title=title,
+                description=description,
+                station_id=station.id if station else None,
+                credited_operator_id=operator.id if operator else None,
+                # A plausible shop-floor interview: two tapped answers, which is
+                # what the operator journey actually produces.
+                interview=[
+                    {"key": "minutes_per_wait", "answer": "5-15 min"},
+                    {"key": "waits_per_shift", "answer": 2},
+                    {"key": "seconds_per_trip", "answer": "30-60 sec"},
+                    {"key": "trips_per_shift", "answer": 8},
+                    {"key": "parts_per_month", "answer": 40},
+                ],
+            ),
             submitted_by_name=name,
-            station_id=station.id if station else None,
         )
         ideas.append(idea)
 
@@ -227,25 +254,30 @@ async def _kaizen(session, plant: Plant) -> int:
     #
     # The facilities request is declined first — with a reason, because an idea
     # that vanishes without an answer is how a suggestion scheme dies. Then the
-    # ideas with the biggest *measured* saving are accepted into the Actions
-    # engine. Only ideas the scorer could price are eligible: accepting an idea
-    # the system values at zero would put an unmeasurable promise on the board.
+    # ideas with the biggest *measured* saving are approved. Only ideas the
+    # engine could price are eligible: approving one the system values at zero
+    # would put an unmeasurable promise on the board.
     fan = next((i for i in ideas if "fan" in i.title.lower()), None)
     if fan is not None:
-        await kaizen_service.reject(
+        await kaizen_service.decide(
             session,
+            plant=plant,
             idea=fan,
+            accept=False,
+            user=None,
             note=(
                 "Good idea, but it is a facilities request rather than a production "
                 "improvement — passed to the admin office, who have ordered two fans."
             ),
         )
 
-    undecided = [i for i in ideas if i.decided_at is None and i.estimated_annual_saving > 0]
-    for idea in sorted(undecided, key=lambda i: i.estimated_annual_saving, reverse=True)[
-        :3
-    ]:
-        await kaizen_service.accept(session, plant=plant, idea=idea)
+    undecided = [
+        i for i in ideas if i.decided_at is None and i.hard_saving_paise > 0
+    ]
+    for idea in sorted(undecided, key=lambda i: i.hard_saving_paise, reverse=True)[:3]:
+        await kaizen_service.decide(
+            session, plant=plant, idea=idea, accept=True, user=None, note="Worth doing."
+        )
 
     return len(ideas)
 

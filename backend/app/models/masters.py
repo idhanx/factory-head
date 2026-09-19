@@ -166,6 +166,10 @@ class Part(Base, PlantScopedMixin, TimestampMixin):
     margin_band: Mapped[MarginBand | None] = mapped_column(String(2))
 
     material_cost: Mapped[int] = mapped_column(default=0)  # paise, for scrap
+    # Scrap is sold back. Ignoring that recovery overstates every scrap saving
+    # by 20-30%, so the weight sits beside the material cost: recovery is
+    # ``weight_kg x scrap recovery rate`` and is deducted, never assumed away.
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(10, 3))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     operations: Mapped[list[RoutingOperation]] = relationship(
@@ -230,12 +234,20 @@ class CostRate(Base, PlantScopedMixin, TimestampMixin):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     # scope: 'cost_family' (machine rate) | 'section' (labour) | 'plant' (overhead)
+    #      | 'utility' (a per-unit rate — see ``unit_rate`` below)
     scope: Mapped[str] = mapped_column(String(20), nullable=False)
     scope_ref: Mapped[str] = mapped_column(String(64), nullable=False)
 
     machine_rate: Mapped[int] = mapped_column(default=0)  # MCR, paise/hour
     labour_rate: Mapped[int] = mapped_column(default=0)  # LCR, paise/hour
     overhead_rate: Mapped[int] = mapped_column(default=0)  # OHR, paise/hour
+    # Rates that are per *unit* rather than per hour: electricity per kWh,
+    # compressed air per m3, scrap sold back per kg. They belong in the cost
+    # master with everything else — a plant's energy cost is a Core cost, not a
+    # Kaizen one — and this is the column the Kaizen approval card writes
+    # through when the plant supplies a missing rate for the first time
+    # (Plugin Spec 7.3, "the one place Kaizen writes a cost value").
+    unit_rate: Mapped[int] = mapped_column(default=0, server_default="0")
 
     source: Mapped[RateSource] = mapped_column(
         EnumString(RateSource, 16), default=RateSource.DEFAULT

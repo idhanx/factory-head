@@ -13,6 +13,8 @@ import { Empty, ErrorNote, Skeleton } from "@/components/ui/misc";
 import { AuthedImage } from "@/components/authed-image";
 import { cn } from "@/lib/utils";
 import type { Action, ActionState } from "@/types/api";
+import { useT } from "@/lib/i18n";
+import { activeLocale } from "@/lib/format";
 
 /** The only moves a person makes by hand, in the words used on the floor. */
 const TRANSITIONS: Partial<Record<ActionState, { label: string; hint: string }>> = {
@@ -37,6 +39,7 @@ const TRANSITIONS: Partial<Record<ActionState, { label: string; hint: string }>>
  *  Memory. Sixty seconds from the person who actually fixed it.
  */
 export default function ActionDetail({ params }: { params: Promise<{ id: string }> }) {
+  const t = useT();
   const { id } = use(params);
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -93,15 +96,15 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
     return (
       <div className="space-y-4">
         <Link href="/actions" className="text-sm text-2 hover:underline">
-          ← Actions
+          {t("← Actions")}
         </Link>
         {notFound ? (
           <Empty
-            title="Action not found"
-            hint="It may belong to another plant, or the link is wrong."
+            title={t("Action not found")}
+            hint={t("It may belong to another plant, or the link is wrong.")}
           />
         ) : (
-          <ErrorNote message={`Could not load this action: ${detail.error.message}`} />
+          <ErrorNote message={t("Could not load this action: {0}", { 0: detail.error.message })} />
         )}
       </div>
     );
@@ -117,7 +120,7 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
     <div className="space-y-6">
       <div>
         <Link href="/actions" className="text-sm text-2 hover:underline">
-          ← Actions
+          {t("← Actions")}
         </Link>
       </div>
 
@@ -144,8 +147,8 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
               {/* The lifecycle IS the PDCA cycle (§5.4), so the phase leads. */}
               <Badge variant="accent">{action.pdca_phase}</Badge>
               <Badge variant="neutral">{action.state.replace(/_/g, " ")}</Badge>
-              {action.routed_to_rca ? <Badge variant="warn">Routed to RCA</Badge> : null}
-              {action.is_overdue ? <Badge variant="stopped">Overdue</Badge> : null}
+              {action.routed_to_rca ? <Badge variant="warn">{t("Routed to RCA")}</Badge> : null}
+              {action.is_overdue ? <Badge variant="stopped">{t("Overdue")}</Badge> : null}
             </div>
             <h1 className="display text-[1.75rem] font-bold leading-tight">{action.title}</h1>
             {action.description ? (
@@ -153,10 +156,10 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
             ) : null}
           </div>
           <div className="shrink-0 text-right">
-            <p className="label mb-1">Attributed loss</p>
+            <p className="label mb-1">{t("Attributed loss")}</p>
             <Money value={action.linked_cost_display} tone="loss" size="xl" />
             <p className="text-3 mt-1 text-xs">
-              across {action.occurrence_count} event{action.occurrence_count === 1 ? "" : "s"}
+              {t("across {0} event{1}", { 0: action.occurrence_count, 1: action.occurrence_count === 1 ? "" : "s" })}
             </p>
           </div>
         </div>
@@ -167,7 +170,7 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
       {transitions.length ? (
         <Card>
           <CardHeader>
-            <CardTitle>Move this action</CardTitle>
+            <CardTitle>{t("Move this action")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
@@ -178,23 +181,22 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
                   variant={state === "cancelled" ? "ghost" : "outline"}
                   className={cn(state === "cancelled" && "border text-[var(--color-loss)]")}
                   disabled={move.isPending}
-                  title={TRANSITIONS[state]?.hint}
+                  title={TRANSITIONS[state] ? t(TRANSITIONS[state].hint) : undefined}
                   onClick={() => (state === "cancelled" ? setConfirmCancel(true) : move.mutate(state))}
                 >
-                  {TRANSITIONS[state]?.label}
+                  {TRANSITIONS[state] ? t(TRANSITIONS[state].label) : null}
                 </Button>
               ))}
             </div>
             {confirmCancel ? (
               <div
                 role="alertdialog"
-                aria-label="Confirm cancel"
+                aria-label={t("Confirm cancel")}
                 className="surface-2 rise rounded-xl border p-4"
               >
-                <p className="text-sm font-semibold">Cancel {action.reference}?</p>
+                <p className="text-sm font-semibold">{t("Cancel {0}?", { 0: action.reference })}</p>
                 <p className="text-2 mt-1 text-xs leading-relaxed">
-                  It leaves the board and no savings will ever be credited to it. The events it
-                  was raised from stay logged and costed.
+                  {t("It leaves the board and no savings will ever be credited to it. The events it was raised from stay logged and costed.")}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
@@ -203,10 +205,10 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
                     disabled={move.isPending}
                     onClick={() => move.mutate("cancelled")}
                   >
-                    {move.isPending ? "Cancelling…" : "Yes, cancel it"}
+                    {move.isPending ? t("Cancelling…") : t("Yes, cancel it")}
                   </Button>
                   <Button size="lg" variant="outline" onClick={() => setConfirmCancel(false)}>
-                    Keep it
+                    {t("Keep it")}
                   </Button>
                 </div>
               </div>
@@ -218,7 +220,7 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
       {action.severity_reasons.length ? (
         <Card>
           <CardHeader>
-            <CardTitle>Why this became an action</CardTitle>
+            <CardTitle>{t("Why this became an action")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-1 text-sm">
@@ -252,10 +254,10 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
 
         <div className="space-y-4">
           <Card>
-            <CardHeader><CardTitle>Recovered profit</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("Recovered profit")}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <p className="text-xs text-2">Baseline (frozen at creation)</p>
+                <p className="text-xs text-2">{t("Baseline (frozen at creation)")}</p>
                 <Money
                   value={`₹${(action.baseline_weekly_loss_paise / 100).toLocaleString("en-IN")}`}
                   size="md"
@@ -264,16 +266,16 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
                 <span className="ml-1 text-xs text-2">/week</span>
               </div>
               <div>
-                <p className="text-xs text-2">Credited so far</p>
+                <p className="text-xs text-2">{t("Credited so far")}</p>
                 <Money value={action.recovered_profit_display} tone="recovered" size="lg" />
               </div>
               {/* Two sustained weeks is the bar (§5.6). Showing it as progress
                   makes the conservatism visible rather than merely asserted. */}
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <span className="label">Sustain</span>
+                  <span className="label">{t("Sustain")}</span>
                   <span className="text-3 tnum text-xs">
-                    {Math.min(action.sustained_weeks, 2)} / 2 weeks
+                    {t("{0} / 2 weeks", { 0: Math.min(action.sustained_weeks, 2) })}
                   </span>
                 </div>
                 <div className="flex gap-1.5">
@@ -291,22 +293,22 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
               </div>
               <p className="text-3 text-xs leading-relaxed">
                 {action.sustained_weeks >= 2
-                  ? `Verified — the fix has held for ${action.sustained_weeks} weeks, so the savings are credited.`
-                  : "Nothing is credited until the fix has held for two consecutive weeks. A fix that lasted one week is not a fix."}
+                  ? t("Verified — the fix has held for {0} weeks, so the savings are credited.", { 0: action.sustained_weeks })
+                  : t("Nothing is credited until the fix has held for two consecutive weeks. A fix that lasted one week is not a fix.")}
               </p>
             </CardContent>
           </Card>
 
           {(action.photos ?? []).length ? (
             <Card>
-              <CardHeader><CardTitle>Photos</CardTitle></CardHeader>
+              <CardHeader><CardTitle>{t("Photos")}</CardTitle></CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-2">
                   {action.photos.map((photo, index) => (
                     <AuthedImage
                       key={photo.id}
                       url={photo.url}
-                      alt={`Photo ${index + 1} for ${action.reference}`}
+                      alt={t("Photo {0} for {1}", { 0: index + 1, 1: action.reference })}
                       className="aspect-square w-full"
                       link
                     />
@@ -317,17 +319,17 @@ export default function ActionDetail({ params }: { params: Promise<{ id: string 
           ) : null}
 
           <Card>
-            <CardHeader><CardTitle>Details</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("Details")}</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <Row label="Station" value={action.station_code ?? "—"} />
-              <Row label="Reason" value={action.reason_label ?? "—"} />
-              <Row label="Owner" value={action.owner_name ?? "unassigned"} />
-              <Row label="Due" value={action.due_date ?? "—"} />
-              <Row label="Trigger" value={action.trigger.replace(/_/g, " ")} />
+              <Row label={t("Station")} value={action.station_code ?? "—"} />
+              <Row label={t("Reason")} value={action.reason_label ?? "—"} />
+              <Row label={t("Owner")} value={action.owner_name ?? "unassigned"} />
+              <Row label={t("Due")} value={action.due_date ?? "—"} />
+              <Row label={t("Trigger")} value={action.trigger.replace(/_/g, " ")} />
               {action.closed_at ? (
                 <Row
-                  label="Closed"
-                  value={new Date(action.closed_at).toLocaleDateString("en-IN", {
+                  label={t("Closed")}
+                  value={new Date(action.closed_at).toLocaleDateString(activeLocale(), {
                     day: "numeric",
                     month: "short",
                     year: "numeric",
@@ -353,6 +355,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 /** §5.5 — pre-filled with the event history, so the team starts from evidence. */
 function FiveWhys({ id, rca }: { id: string; rca: NonNullable<Awaited<ReturnType<typeof api.rca>>> }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [whys, setWhys] = useState(
     rca.five_whys?.length ? rca.five_whys : Array.from({ length: 5 }, () => ({ why: "", because: "" })),
@@ -373,24 +376,21 @@ function FiveWhys({ id, rca }: { id: string; rca: NonNullable<Awaited<ReturnType
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Root cause — 5 Why</CardTitle>
+        <CardTitle>{t("Root cause — 5 Why")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {context ? (
           <div className="rounded-lg surface-2 p-3 text-sm">
             <p className="label mb-1">
-              What we already know
+              {t("What we already know")}
             </p>
             <p>
-              {String(context.occurrences)} occurrence(s) of {String(context.reason)} on{" "}
-              {String(context.station)}
-              {Array.isArray(context.event_dates) && context.event_dates.length
+              {t("{0} occurrence(s) of {1} on {2}{3}.", { 0: String(context.occurrences), 1: String(context.reason), 2: String(context.station), 3: Array.isArray(context.event_dates) && context.event_dates.length
                 ? ` — ${(context.event_dates as string[]).join(", ")}`
-                : ""}
-              .
+                : "" })}
             </p>
             <p className="mt-1 text-2">
-              A blank form at 8 AM gets closed again. This one starts from the evidence.
+              {t("A blank form at 8 AM gets closed again. This one starts from the evidence.")}
             </p>
           </div>
         ) : null}
@@ -399,7 +399,7 @@ function FiveWhys({ id, rca }: { id: string; rca: NonNullable<Awaited<ReturnType
           {whys.map((row, index) => (
             <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr]">
               <Input
-                placeholder={index === 0 ? "Why did it happen?" : `Why ${index + 1}?`}
+                placeholder={index === 0 ? t("Why did it happen?") : t("Why {0}?", { 0: index + 1 })}
                 value={row.why}
                 onChange={(e) => {
                   const next = [...whys];
@@ -408,7 +408,7 @@ function FiveWhys({ id, rca }: { id: string; rca: NonNullable<Awaited<ReturnType
                 }}
               />
               <Input
-                placeholder="Because…"
+                placeholder={t("Because…")}
                 value={row.because}
                 onChange={(e) => {
                   const next = [...whys];
@@ -421,26 +421,26 @@ function FiveWhys({ id, rca }: { id: string; rca: NonNullable<Awaited<ReturnType
         </div>
 
         <div>
-          <Label htmlFor="conclusion">Root cause</Label>
+          <Label htmlFor="conclusion">{t("Root cause")}</Label>
           <Textarea
             id="conclusion"
             rows={2}
             value={conclusion}
             onChange={(e) => setConclusion(e.target.value)}
-            placeholder="Bearing seized — wrong grease grade used at the last PM"
+            placeholder={t("Bearing seized — wrong grease grade used at the last PM")}
           />
           <p className="mt-1 text-xs text-2">
-            The reason code said what happened. This says why.
+            {t("The reason code said what happened. This says why.")}
           </p>
         </div>
 
         {save.error ? <ErrorNote message={save.error.message} /> : null}
         {save.isSuccess ? (
-          <p role="status" className="text-xs text-[var(--color-running)]">Saved.</p>
+          <p role="status" className="text-xs text-[var(--color-running)]">{t("Saved.")}</p>
         ) : null}
 
         <Button size="lg" onClick={() => save.mutate()} disabled={save.isPending}>
-          {save.isPending ? "Saving…" : "Save root cause"}
+          {save.isPending ? t("Saving…") : t("Save root cause")}
         </Button>
       </CardContent>
     </Card>
@@ -470,6 +470,7 @@ function ClosureForm({
   needsRootCause: boolean;
   onSubmit: (payload: Record<string, unknown>) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [rootCause, setRootCause] = useState("");
   const [countermeasure, setCountermeasure] = useState("");
@@ -492,7 +493,7 @@ function ClosureForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Close this action</CardTitle>
+        <CardTitle>{t("Close this action")}</CardTitle>
       </CardHeader>
       <CardContent>
         <form
@@ -513,24 +514,24 @@ function ClosureForm({
         >
           {needsRootCause ? (
             <div>
-              <Label htmlFor="root">Root cause</Label>
+              <Label htmlFor="root">{t("Root cause")}</Label>
               <Input
                 id="root"
                 value={rootCause}
                 onChange={(e) => setRootCause(e.target.value)}
-                placeholder="Wrong grease grade used at the last PM"
+                placeholder={t("Wrong grease grade used at the last PM")}
               />
             </div>
           ) : null}
 
           <div>
-            <Label htmlFor="counter">Countermeasure</Label>
+            <Label htmlFor="counter">{t("Countermeasure")}</Label>
             <Input
               id="counter"
               required
               value={countermeasure}
               onChange={(e) => setCountermeasure(e.target.value)}
-              placeholder="Changed PM spec to the correct grease grade and retrained the team"
+              placeholder={t("Changed PM spec to the correct grease grade and retrained the team")}
             />
           </div>
 
@@ -539,44 +540,43 @@ function ClosureForm({
               <span className="brand grid size-5 place-items-center rounded-md text-[0.625rem] font-bold">
                 4
               </span>
-              Factory Memory — 60 seconds
+              {t("Factory Memory — 60 seconds")}
             </p>
             <p className="text-3 mb-4 text-xs leading-relaxed">
-              Four questions, asked once. The next person who hits this problem — in two
-              years, after you have left — gets your answer in thirty seconds.
+              {t("Four questions, asked once. The next person who hits this problem — in two years, after you have left — gets your answer in thirty seconds.")}
             </p>
 
             <div className="space-y-3">
               <div>
-                <Label htmlFor="fixed">1. What fixed it?</Label>
+                <Label htmlFor="fixed">{t("1. What fixed it?")}</Label>
                 <Input
                   id="fixed"
                   required
                   value={whatFixed}
                   onChange={(e) => setWhatFixed(e.target.value)}
-                  placeholder="Replaced the carbide insert grade on Station 3"
+                  placeholder={t("Replaced the carbide insert grade on Station 3")}
                 />
               </div>
               <div>
-                <Label htmlFor="replaced">2. What did you replace or change?</Label>
+                <Label htmlFor="replaced">{t("2. What did you replace or change?")}</Label>
                 <Input
                   id="replaced"
                   value={replaced}
                   onChange={(e) => setReplaced(e.target.value)}
-                  placeholder="Insert grade P25 → P15"
+                  placeholder={t("Insert grade P25 → P15")}
                 />
               </div>
               <div>
-                <Label htmlFor="check">3. What should someone check first next time?</Label>
+                <Label htmlFor="check">{t("3. What should someone check first next time?")}</Label>
                 <Input
                   id="check"
                   value={checkFirst}
                   onChange={(e) => setCheckFirst(e.target.value)}
-                  placeholder="Check insert wear at 240 parts, not 310"
+                  placeholder={t("Check insert wear at 240 parts, not 310")}
                 />
               </div>
               <div>
-                <Label htmlFor="closure-photo">4. Attach a photo (optional)</Label>
+                <Label htmlFor="closure-photo">{t("4. Attach a photo (optional)")}</Label>
                 <input
                   id="closure-photo"
                   type="file"
@@ -590,10 +590,10 @@ function ClosureForm({
                     if (!file) return;
                     photo.reset();
                     if (!PHOTO_TYPES.includes(file.type)) {
-                      return setPhotoInvalid("Use a JPEG, PNG or WebP photo.");
+                      return setPhotoInvalid(t("Use a JPEG, PNG or WebP photo."));
                     }
                     if (file.size > PHOTO_MAX_BYTES) {
-                      return setPhotoInvalid("That photo is over 10 MB. Take it again at a lower size.");
+                      return setPhotoInvalid(t("That photo is over 10 MB. Take it again at a lower size."));
                     }
                     setPhotoInvalid(null);
                     photo.mutate(file);
@@ -601,20 +601,20 @@ function ClosureForm({
                   className="text-2 block w-full text-sm file:mr-3 file:h-11 file:cursor-pointer file:rounded-full file:border file:border-[var(--border)] file:bg-[var(--surface-2)] file:px-4 file:text-sm file:font-medium file:text-[var(--text)]"
                 />
                 <p id="closure-photo-hint" className="text-3 mt-1 text-xs">
-                  The fixed part, the worn one, or the setting that was changed. Opens the camera on a tablet.
+                  {t("The fixed part, the worn one, or the setting that was changed. Opens the camera on a tablet.")}
                 </p>
-                {photo.isPending ? <p role="status" className="text-2 mt-2 text-xs">Uploading photo…</p> : null}
+                {photo.isPending ? <p role="status" className="text-2 mt-2 text-xs">{t("Uploading photo…")}</p> : null}
                 {photoInvalid ? <div className="mt-2"><ErrorNote message={photoInvalid} /></div> : null}
                 {photo.error ? (
                   <div className="mt-2">
-                    <ErrorNote message={`Could not upload the photo: ${photo.error.message}`} />
+                    <ErrorNote message={t("Could not upload the photo: {0}", { 0: photo.error.message })} />
                   </div>
                 ) : null}
                 {photoUrl ? (
                   <div className="mt-3 flex items-end gap-3">
-                    <AuthedImage url={photoUrl} alt="Uploaded closure photo" className="size-28" />
+                    <AuthedImage url={photoUrl} alt={t("Uploaded closure photo")} className="size-28" />
                     <p role="status" className="text-2 text-xs">
-                      Uploaded. It goes into Factory Memory with your answers. Pick another to replace it.
+                      {t("Uploaded. It goes into Factory Memory with your answers. Pick another to replace it.")}
                     </p>
                   </div>
                 ) : null}
@@ -623,9 +623,7 @@ function ClosureForm({
           </div>
 
           <div className="rounded-xl border border-dashed p-3.5 text-xs leading-relaxed text-2">
-            Closing moves this to <strong>Monitoring</strong>, not Done. The system watches
-            the linked reason code for the next few weeks — if the loss actually stopped, the
-            savings are credited; if the events come back, the action reopens.
+            {t("Closing moves this to")}{" "}<strong>{t("Monitoring")}</strong>{t(", not Done. The system watches the linked reason code for the next few weeks — if the loss actually stopped, the savings are credited; if the events come back, the action reopens.")}
           </div>
 
           {/* Repeated beside the button: the person who just typed four answers
@@ -633,7 +631,7 @@ function ClosureForm({
           {error ? <ErrorNote message={error} /> : null}
 
           <Button type="submit" size="touch" disabled={busy || photo.isPending}>
-            {busy ? "Closing…" : photo.isPending ? "Waiting for the photo…" : "Close and start monitoring"}
+            {busy ? t("Closing…") : photo.isPending ? t("Waiting for the photo…") : t("Close and start monitoring")}
           </Button>
         </form>
       </CardContent>
@@ -642,32 +640,33 @@ function ClosureForm({
 }
 
 function ClosedSummary({ action }: { action: Action }) {
+  const t = useT();
   return (
     <Card>
       <CardHeader>
         <CardTitle>
           {action.state === "verified"
-            ? "Verified"
+            ? t("Verified")
             : action.state === "cancelled"
-              ? "Cancelled"
-              : "Monitoring"}
+              ? t("Cancelled")
+              : t("Monitoring")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div>
-          <p className="text-xs text-2">Root cause</p>
+          <p className="text-xs text-2">{t("Root cause")}</p>
           <p>{action.root_cause ?? "—"}</p>
         </div>
         <div>
-          <p className="text-xs text-2">Countermeasure</p>
+          <p className="text-xs text-2">{t("Countermeasure")}</p>
           <p>{action.countermeasure ?? "—"}</p>
         </div>
         <p className="text-xs text-2">
           {action.state === "verified"
-            ? "The loss rate stayed down for two consecutive weeks, so the savings are credited to this action."
+            ? t("The loss rate stayed down for two consecutive weeks, so the savings are credited to this action.")
             : action.state === "cancelled"
-              ? "Cancelled — no savings are credited. The events behind it stay logged and costed."
-              : "Watching the linked reason code. Savings are credited only once the fix has held."}
+              ? t("Cancelled — no savings are credited. The events behind it stay logged and costed.")
+              : t("Watching the linked reason code. Savings are credited only once the fix has held.")}
         </p>
       </CardContent>
     </Card>

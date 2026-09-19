@@ -12,6 +12,7 @@ import { Label, Select } from "@/components/ui/input";
 import { ErrorNote, Skeleton } from "@/components/ui/misc";
 import type { ChannelState, NotificationChannels, NotificationLog } from "@/types/api";
 import { DataTable, ListState, Toolbar } from "./shared";
+import { useT } from "@/lib/i18n";
 
 /**
  * Who was told what, and whether it arrived.
@@ -62,6 +63,7 @@ function channelNote(state: ChannelState): { badge: "recovered" | "warn" | "neut
 }
 
 export function NotificationsTab() {
+  const t = useT();
   const [kind, setKind] = useState("");
   const [status, setStatus] = useState("");
 
@@ -73,23 +75,23 @@ export function NotificationsTab() {
 
   const rows = log.data ?? [];
   const label = (list: Array<{ value: string; label: string }>, value: string) =>
-    list.find((item) => item.value === value)?.label ?? value.replace(/_/g, " ");
+    t(list.find((item) => item.value === value)?.label ?? value.replace(/_/g, " "));
 
   return (
     <div className="space-y-6">
       <Toolbar
-        title="Notifications"
-        hint="Escalations and reports go out on WhatsApp first, SMS if that fails, and browser push to anyone who turned it on with the bell in the header."
+        title={t("Notifications")}
+        hint={t("Escalations and reports go out on WhatsApp first, SMS if that fails, and browser push to anyone who turned it on with the bell in the header.")}
       />
 
-      <section aria-label="Delivery channels">
+      <section aria-label={t("Delivery channels")}>
         {channels.isLoading ? (
           <Skeleton className="h-28" />
         ) : channels.error ? (
           <div className="space-y-3">
-            <ErrorNote message={`Could not load the channel status: ${channels.error.message}`} />
+            <ErrorNote message={t("Could not load the channel status: {0}", { 0: channels.error.message })} />
             <Button size="lg" variant="outline" onClick={() => void channels.refetch()}>
-              Try again
+              {t("Try again")}
             </Button>
           </div>
         ) : channels.data ? (
@@ -110,8 +112,7 @@ export function NotificationsTab() {
                     <p className="text-3 text-xs">{provider}</p>
                     {state && !state.configured ? (
                       <p className="text-2 mt-2 text-xs leading-relaxed">
-                        Messages are logged below as skipped until the provider&apos;s credentials are added on the
-                        server.
+                        {t("Messages are logged below as skipped until the provider's credentials are added on the server.")}
                       </p>
                     ) : null}
                   </CardContent>
@@ -125,22 +126,22 @@ export function NotificationsTab() {
       <section aria-labelledby="delivery-log">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <h3 id="delivery-log" className="display text-base font-bold">
-            Delivery log
+            {t("Delivery log")}
           </h3>
           <div className="flex flex-wrap items-end gap-3">
             <div>
-              <Label htmlFor="notif-kind">Kind</Label>
+              <Label htmlFor="notif-kind">{t("Kind")}</Label>
               <Select id="notif-kind" value={kind} onChange={(e) => setKind(e.target.value)} className="min-w-44">
-                <option value="">All kinds</option>
+                <option value="">{t("All kinds")}</option>
                 {KINDS.map((k) => (
                   <option key={k.value} value={k.value}>{k.label}</option>
                 ))}
               </Select>
             </div>
             <div>
-              <Label htmlFor="notif-status">Status</Label>
+              <Label htmlFor="notif-status">{t("Status")}</Label>
               <Select id="notif-status" value={status} onChange={(e) => setStatus(e.target.value)} className="min-w-36">
-                <option value="">All</option>
+                <option value="">{t("All")}</option>
                 {STATUSES.map((s) => (
                   <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
@@ -154,7 +155,7 @@ export function NotificationsTab() {
           error={log.error}
           empty={rows.length === 0}
           emptyTitle={kind || status ? "Nothing matches these filters" : "Nothing sent yet"}
-          emptyHint={kind || status ? "Clear a filter to see more." : "Escalations and reports appear here as they go out."}
+          emptyHint={kind || status ? t("Clear a filter to see more.") : t("Escalations and reports appear here as they go out.")}
           onRetry={() => void log.refetch()}
         >
           <DataTable<NotificationLog>
@@ -165,7 +166,7 @@ export function NotificationsTab() {
                 cell: (n) => (
                   <span className="tnum whitespace-nowrap">
                     {formatDate(n.created_at)}, {formatClock(n.created_at)}
-                    {n.sent_at ? <span className="text-3 block text-xs">sent {formatClock(n.sent_at)}</span> : null}
+                    {n.sent_at ? <span className="text-3 block text-xs">{t("sent {0}", { 0: formatClock(n.sent_at) })}</span> : null}
                   </span>
                 ),
               },
@@ -185,7 +186,7 @@ export function NotificationsTab() {
                 cell: (n) => (
                   <span className="whitespace-nowrap">
                     <Badge variant={STATUS_BADGE[n.status] ?? "neutral"}>{label(STATUSES, n.status)}</Badge>
-                    {n.attempts > 1 ? <span className="text-3 ml-1.5 text-xs">{n.attempts} tries</span> : null}
+                    {n.attempts > 1 ? <span className="text-3 ml-1.5 text-xs">{t("{0} tries", { 0: n.attempts })}</span> : null}
                   </span>
                 ),
               },

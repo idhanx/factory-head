@@ -4,8 +4,11 @@ import type { Role } from "@/types/api";
 export function homeFor(roles: Role[]): string {
   if (roles.includes("owner") || roles.includes("consultant")) return "/owner";
   if (roles.includes("quality")) return "/quality";
-  if (roles.includes("maintenance")) return "/actions";
-  if (roles.includes("stores")) return "/actions";
+  // §1 gives both of these roles a cadence of "when events occur", so their
+  // home is the desk that shows what is happening now — not the Actions board,
+  // which is the PDCA backlog and answers a different question entirely.
+  if (roles.includes("maintenance")) return "/maintenance";
+  if (roles.includes("stores")) return "/stores";
   return "/floor";
 }
 
@@ -29,6 +32,11 @@ export const NAV: Array<{
   // it never inherits the stricter `/shift` entry above.
   { href: "/shifts", label: "Shift history", roles: ["supervisor", "owner", "consultant"], group: "capture" },
   { href: "/quality", label: "Quality", roles: ["quality", "owner"], group: "capture" },
+  // §1's two "when events occur" roles. Each desk reads Core data the plant is
+  // already capturing and writes only the one thing §1 names for that role:
+  // maintenance logs what fixed a breakdown, stores confirms material staging.
+  { href: "/maintenance", label: "Maintenance", roles: ["maintenance", "supervisor", "owner", "consultant"], group: "capture" },
+  { href: "/stores", label: "Stores", roles: ["stores", "supervisor", "owner", "consultant"], group: "capture" },
   { href: "/meeting", label: "Morning Meeting", roles: ["supervisor", "owner", "quality", "maintenance", "stores"], group: "improve" },
   { href: "/actions", label: "Actions", roles: ["supervisor", "owner", "maintenance", "stores", "quality"], group: "improve" },
   // §3 traceability and §14.2 stage tracking share one entry: both are about lots.

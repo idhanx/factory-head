@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorNote, Skeleton } from "@/components/ui/misc";
 import type { PlantSettings } from "@/types/api";
 import { RecordForm, Toolbar, toValues, type FieldSpec } from "./shared";
+import { useT } from "@/lib/i18n";
 
 /**
  * Plant-wide rules: when a loss becomes an action, how far two counts may
@@ -110,6 +111,7 @@ const PLANT_FIELDS: FieldSpec[] = [
 ];
 
 export function PlantTab() {
+  const t = useT();
   const queryClient = useQueryClient();
   const session = loadSession();
   const isAdmin = session?.roles.includes("admin") ?? false;
@@ -133,17 +135,17 @@ export function PlantTab() {
   return (
     <div className="space-y-6">
       <Toolbar
-        title="Plant"
-        hint="Thresholds and money settings for this plant. Changes apply from the next shift close; nothing already closed is re-costed."
+        title={t("Plant")}
+        hint={t("Thresholds and money settings for this plant. Changes apply from the next shift close; nothing already closed is re-costed.")}
       />
 
       {plant.isLoading ? (
         <Skeleton className="h-96" />
       ) : plant.error ? (
         <div className="space-y-3">
-          <ErrorNote message={`Could not load the plant settings: ${plant.error.message}`} />
+          <ErrorNote message={t("Could not load the plant settings: {0}", { 0: plant.error.message })} />
           <Button size="lg" variant="outline" onClick={() => void plant.refetch()}>
-            Try again
+            {t("Try again")}
           </Button>
         </div>
       ) : plant.data ? (
@@ -151,7 +153,7 @@ export function PlantTab() {
           <CardContent className="pt-5">
             {saved ? (
               <p role="status" className="surface-2 rise mb-4 rounded-xl border px-4 py-2 text-sm">
-                Plant settings saved.
+                {t("Plant settings saved.")}
               </p>
             ) : null}
             <RecordForm
@@ -204,6 +206,7 @@ const NEW_PLANT_FIELDS: FieldSpec[] = [
 
 /** Admin only. The caller becomes admin of the new plant and can switch to it. */
 function CreatePlant() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [created, setCreated] = useState<PlantSettings | null>(null);
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -251,11 +254,11 @@ function CreatePlant() {
       <CardHeader className="flex-wrap justify-between">
         <CardTitle className="flex items-center gap-1.5">
           <Factory className="size-3.5" />
-          Create a plant · admin
+          {t("Create a plant · admin")}
         </CardTitle>
         {!open ? (
           <Button size="lg" variant="outline" onClick={() => setOpen(true)}>
-            New plant
+            {t("New plant")}
           </Button>
         ) : null}
       </CardHeader>
@@ -263,14 +266,14 @@ function CreatePlant() {
         {created ? (
           <div role="status" className="surface-2 rise flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm">
             <span>
-              <span className="font-semibold">{created.name}</span> ({created.code}) created. You are its admin.
+              <span className="font-semibold">{created.name}</span> ({created.code}{t(") created. You are its admin.")}
             </span>
             <Button size="lg" disabled={switchTo.isPending} onClick={() => switchTo.mutate(created.id)}>
-              {switchTo.isPending ? "Switching…" : "Switch to it"}
+              {switchTo.isPending ? t("Switching…") : t("Switch to it")}
             </Button>
           </div>
         ) : null}
-        {switchTo.error ? <ErrorNote message={`Could not switch plant: ${switchTo.error.message}`} /> : null}
+        {switchTo.error ? <ErrorNote message={t("Could not switch plant: {0}", { 0: switchTo.error.message })} /> : null}
 
         {open ? (
           <RecordForm
@@ -283,7 +286,7 @@ function CreatePlant() {
             serverError={invalid ?? create.error?.message}
             onSubmit={(payload) => {
               if (!payload.owner_email && !payload.owner_phone) {
-                setInvalid("Give the owner an email or a phone number to log in with.");
+                setInvalid(t("Give the owner an email or a phone number to log in with."));
                 return;
               }
               setInvalid(null);
@@ -297,7 +300,7 @@ function CreatePlant() {
           />
         ) : (
           <p className="text-3 text-sm">
-            Sets up an empty plant with its first owner. Masters come next, from the onboarding templates.
+            {t("Sets up an empty plant with its first owner. Masters come next, from the onboarding templates.")}
           </p>
         )}
       </CardContent>

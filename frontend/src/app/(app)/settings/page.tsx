@@ -14,6 +14,8 @@ import { CostRatesTab } from "@/components/settings/cost-rates";
 import { JobOrdersTab } from "@/components/settings/job-orders";
 import { HeldEntriesTab } from "@/components/settings/held-entries";
 import { NotificationsTab } from "@/components/settings/notifications";
+import { LanguageTab } from "@/components/settings/language";
+import { useT } from "@/lib/i18n";
 
 /**
  * Settings — the plant's own data, editable without a developer.
@@ -25,6 +27,7 @@ import { NotificationsTab } from "@/components/settings/notifications";
  */
 
 const TABS = [
+  { key: "language", label: "Language" },
   { key: "users", label: "Users" },
   { key: "plant", label: "Plant" },
   { key: "stations", label: "Stations" },
@@ -51,45 +54,46 @@ export default function SettingsPage() {
 }
 
 function Settings() {
+  const t = useT();
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const requested = params.get("tab");
-  const tab: Tab = TABS.some((t) => t.key === requested) ? (requested as Tab) : "users";
+  const tab: Tab = TABS.some((item) => item.key === requested) ? (requested as Tab) : "users";
 
   return (
     <div className="space-y-6">
       <header className="rise">
         <p className="label mb-1.5 flex items-center gap-1.5">
           <SlidersHorizontal className="size-3" />
-          Plant setup
+          {t("Plant setup")}
         </p>
-        <h1 className="display text-[1.75rem] font-bold">Settings</h1>
+        <h1 className="display text-[1.75rem] font-bold">{t("Settings")}</h1>
         <p className="text-2 mt-1 max-w-2xl text-sm leading-relaxed">
-          People, machines, parts and codes. Nothing here is ever deleted — retire a row and
-          everything already recorded against it keeps its meaning.
+          {t("People, machines, parts and codes. Nothing here is ever deleted — retire a row and everything already recorded against it keeps its meaning.")}
         </p>
       </header>
 
       <div className="surface-2 flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-xl border p-1" role="tablist">
-        {TABS.map((t) => (
+        {TABS.map((item) => (
           <button
-            key={t.key}
+            key={item.key}
             type="button"
             role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => router.replace(`${pathname}?tab=${t.key}`, { scroll: false })}
+            aria-selected={tab === item.key}
+            onClick={() => router.replace(`${pathname}?tab=${item.key}`, { scroll: false })}
             className={cn(
               "min-h-11 rounded-lg px-3.5 text-[0.8125rem] font-medium whitespace-nowrap transition-colors",
-              tab === t.key ? "brand font-semibold" : "text-2 hover:text-[var(--text)]",
+              tab === item.key ? "brand font-semibold" : "text-2 hover:text-[var(--text)]",
             )}
           >
-            {t.label}
+            {t(item.label)}
           </button>
         ))}
       </div>
 
-      <section role="tabpanel" aria-label={TABS.find((t) => t.key === tab)?.label}>
+      <section role="tabpanel" aria-label={t(TABS.find((item) => item.key === tab)?.label ?? "Settings")}>
+        {tab === "language" ? <LanguageTab /> : null}
         {tab === "users" ? <UsersTab /> : null}
         {tab === "plant" ? <PlantTab /> : null}
         {tab === "stations" ? <MasterTab key="stations" config={STATIONS} /> : null}

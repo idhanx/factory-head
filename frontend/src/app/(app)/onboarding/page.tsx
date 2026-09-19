@@ -12,6 +12,7 @@ import { Input, Label } from "@/components/ui/input";
 import { ErrorNote, Skeleton } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import type { ReadinessResult, UploadConfirmResult, UploadPreview } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 type Template = Awaited<ReturnType<typeof api.templates>>[number];
 
@@ -25,6 +26,7 @@ type Template = Awaited<ReturnType<typeof api.templates>>[number];
  * templates, with T1 and T2 marked as the go-live minimum.
  */
 export default function Onboarding() {
+  const t = useT();
   const templates = useQuery({ queryKey: ["templates"], queryFn: api.templates });
   const questions = useQuery({ queryKey: ["readiness-q"], queryFn: api.readinessQuestions });
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
@@ -38,7 +40,7 @@ export default function Onboarding() {
 
   async function score() {
     if (!plantName.trim()) {
-      setScoreError("Enter the plant's name so the score is filed against it.");
+      setScoreError(t("Enter the plant's name so the score is filed against it."));
       return;
     }
     setBusy(true);
@@ -46,7 +48,7 @@ export default function Onboarding() {
     try {
       setResult(await api.submitReadiness({ plant_name: plantName.trim(), answers }));
     } catch (e) {
-      setScoreError(`Could not score readiness: ${(e as Error).message}`);
+      setScoreError(t("Could not score readiness: {0}", { 0: (e as Error).message }));
     } finally {
       setBusy(false);
     }
@@ -57,10 +59,10 @@ export default function Onboarding() {
   return (
     <div className="space-y-8">
       <header className="rise">
-        <p className="label mb-1.5">§4.1 · upload first, type last</p>
-        <h1 className="display text-[1.75rem] font-bold">Onboarding</h1>
+        <p className="label mb-1.5">{t("§4.1 · upload first, type last")}</p>
+        <h1 className="display text-[1.75rem] font-bold">{t("Onboarding")}</h1>
         <p className="text-2 mt-1 max-w-2xl text-sm leading-relaxed">
-          Upload first, type last. A plant that hands over T1 and T2 can go live the same day.
+          {t("Upload first, type last. A plant that hands over T1 and T2 can go live the same day.")}
         </p>
       </header>
 
@@ -68,12 +70,12 @@ export default function Onboarding() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-2">
-          The template pack
+          {t("The template pack")}
         </h2>
         {templates.isLoading ? (
           <Skeleton className="h-48" />
         ) : templates.error ? (
-          <ErrorNote message={`Could not load the template list: ${templates.error.message}`} />
+          <ErrorNote message={t("Could not load the template list: {0}", { 0: templates.error.message })} />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {(templates.data ?? []).map((template) => (
@@ -81,20 +83,19 @@ export default function Onboarding() {
                 <CardHeader className="flex items-center justify-between pb-2">
                   <CardTitle>{template.code}</CardTitle>
                   {template.go_live_minimum ? (
-                    <Badge variant="accent">Go-live minimum</Badge>
+                    <Badge variant="accent">{t("Go-live minimum")}</Badge>
                   ) : null}
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm font-medium">{template.name}</p>
                   <p className="mt-1 text-xs text-2">
-                    {template.required_columns.length} required ·{" "}
-                    {template.optional_columns.length} optional
+                    {t("{0} required · {1} optional", { 0: template.required_columns.length, 1: template.optional_columns.length })}
                   </p>
                   <a
                     href={`/api/v1/onboarding/templates/${template.code}/blank`}
                     className="mt-3 inline-flex min-h-11 items-center text-xs text-[var(--color-accent)] hover:underline"
                   >
-                    Download blank →
+                    {t("Download blank →")}
                   </a>
                   <Button
                     size="lg"
@@ -103,7 +104,7 @@ export default function Onboarding() {
                     onClick={() => setUploading(template)}
                   >
                     <FileUp className="size-4" />
-                    Upload filled file
+                    {t("Upload filled file")}
                   </Button>
                 </CardContent>
               </Card>
@@ -111,15 +112,13 @@ export default function Onboarding() {
           </div>
         )}
         <p className="mt-3 text-xs text-2">
-          Each template ships with a worked example row, because the commonest onboarding
-          failure is a plant sending their own spreadsheet layout and someone spending a day
-          reshaping it.
+          {t("Each template ships with a worked example row, because the commonest onboarding failure is a plant sending their own spreadsheet layout and someone spending a day reshaping it.")}
         </p>
       </section>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-2">
-          Digital readiness
+          {t("Digital readiness")}
         </h2>
 
         {result ? (
@@ -136,7 +135,7 @@ export default function Onboarding() {
               {result.priority_gaps.length ? (
                 <div className="mt-4">
                   <p className="label mb-2">
-                    Priority gaps
+                    {t("Priority gaps")}
                   </p>
                   <ul className="space-y-1 text-sm">
                     {result.priority_gaps.map((gap) => (
@@ -149,8 +148,7 @@ export default function Onboarding() {
                 </div>
               ) : null}
               <p className="mt-4 text-xs text-2">
-                A low score is not a reason not to start — it means there is more to recover.
-                It sets the onboarding effort, nothing else.
+                {t("A low score is not a reason not to start — it means there is more to recover. It sets the onboarding effort, nothing else.")}
               </p>
             </CardContent>
           </Card>
@@ -159,17 +157,17 @@ export default function Onboarding() {
         <Card>
           <CardContent className="space-y-5 pt-5">
             <div className="max-w-md">
-              <Label htmlFor="readiness-plant">Plant name</Label>
+              <Label htmlFor="readiness-plant">{t("Plant name")}</Label>
               <Input
                 id="readiness-plant"
                 value={plantName}
                 onChange={(e) => setPlantName(e.target.value)}
-                placeholder="Sri Balaji Precision Components, Hosur"
+                placeholder={t("Sri Balaji Precision Components, Hosur")}
               />
             </div>
             {questions.isLoading ? <Skeleton className="h-40" /> : null}
             {questions.error ? (
-              <ErrorNote message={`Could not load the questions: ${questions.error.message}`} />
+              <ErrorNote message={t("Could not load the questions: {0}", { 0: questions.error.message })} />
             ) : null}
             {Object.entries(sections).map(([section, items]) => (
               <div key={section}>
@@ -198,7 +196,7 @@ export default function Onboarding() {
             ))}
             {scoreError ? <ErrorNote message={scoreError} /> : null}
             <Button size="lg" onClick={() => void score()} disabled={busy}>
-              {busy ? "Scoring…" : "Score readiness"}
+              {busy ? t("Scoring…") : t("Score readiness")}
             </Button>
           </CardContent>
         </Card>
@@ -216,6 +214,7 @@ export default function Onboarding() {
  * left alone, so pressing it twice is harmless.
  */
 function DefaultCodes() {
+  const t = useT();
   const queryClient = useQueryClient();
   const load = useMutation({
     mutationFn: api.loadOnboardingDefaults,
@@ -231,30 +230,26 @@ function DefaultCodes() {
       <CardHeader className="flex-wrap justify-between">
         <CardTitle className="flex items-center gap-1.5">
           <ListChecks className="size-3.5" />
-          Standard reason and defect codes
+          {t("Standard reason and defect codes")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-2 max-w-2xl text-sm leading-relaxed">
-          Loads the default downtime reasons and defect codes (template T6) so the floor can start
-          logging today. Codes this plant already has are skipped; edit or retire any of them later
-          in Settings.
+          {t("Loads the default downtime reasons and defect codes (template T6) so the floor can start logging today. Codes this plant already has are skipped; edit or retire any of them later in Settings.")}
         </p>
         {load.data ? (
           <p role="status" className="surface-2 rise flex items-start gap-2 rounded-xl border px-4 py-3 text-sm">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[var(--color-running)]" />
             <span>
-              Added {load.data.reason_codes_added} reason code{load.data.reason_codes_added === 1 ? "" : "s"} and{" "}
-              {load.data.defect_codes_added} defect code{load.data.defect_codes_added === 1 ? "" : "s"}.
-              {load.data.reason_codes_added + load.data.defect_codes_added === 0
+              {t("Added {0} reason code{1} and {2} defect code{3}.{4}", { 0: load.data.reason_codes_added, 1: load.data.reason_codes_added === 1 ? "" : "s", 2: load.data.defect_codes_added, 3: load.data.defect_codes_added === 1 ? "" : "s", 4: load.data.reason_codes_added + load.data.defect_codes_added === 0
                 ? " This plant already had all of them."
-                : ""}
+                : "" })}
             </span>
           </p>
         ) : null}
-        {load.error ? <ErrorNote message={`Could not load the default codes: ${load.error.message}`} /> : null}
+        {load.error ? <ErrorNote message={t("Could not load the default codes: {0}", { 0: load.error.message })} /> : null}
         <Button size="lg" variant="outline" disabled={load.isPending} onClick={() => load.mutate()}>
-          {load.isPending ? "Loading codes…" : "Load default reason & defect codes"}
+          {load.isPending ? t("Loading codes…") : t("Load default reason & defect codes")}
         </Button>
       </CardContent>
     </Card>
@@ -267,6 +262,7 @@ function DefaultCodes() {
  * worse than none, because nobody knows which half is missing.
  */
 function UploadSheet({ template, onClose }: { template: Template; onClose: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<UploadPreview | null>(null);
@@ -299,7 +295,7 @@ function UploadSheet({ template, onClose }: { template: Template; onClose: () =>
 
   return (
     <Sheet
-      title={`Upload ${template.code}`}
+      title={t("Upload {0}", { 0: template.code })}
       subtitle={template.name}
       onClose={onClose}
       className="max-w-4xl"
@@ -310,16 +306,16 @@ function UploadSheet({ template, onClose }: { template: Template; onClose: () =>
             <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[var(--color-running)]" />
             <div>
               <p className="font-semibold">
-                Imported {done.imported} row{done.imported === 1 ? "" : "s"} from {done.template}.
+                {t("Imported {0} row{1} from {2}.", { 0: done.imported, 1: done.imported === 1 ? "" : "s", 2: done.template })}
               </p>
               <p className="text-2 mt-0.5 text-sm">
-                They are live now — in the pickers, on the grid and in Settings.
+                {t("They are live now — in the pickers, on the grid and in Settings.")}
               </p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="lg" onClick={onClose}>Done</Button>
-            <Button size="lg" variant="outline" onClick={reset}>Upload another file</Button>
+            <Button size="lg" onClick={onClose}>{t("Done")}</Button>
+            <Button size="lg" variant="outline" onClick={reset}>{t("Upload another file")}</Button>
           </div>
         </div>
       ) : (
@@ -332,7 +328,7 @@ function UploadSheet({ template, onClose }: { template: Template; onClose: () =>
             }}
           >
             <div>
-              <Label htmlFor={inputId}>Filled-in {template.code} file (.xlsx)</Label>
+              <Label htmlFor={inputId}>{t("Filled-in {0} file (.xlsx)", { 0: template.code })}</Label>
               <input
                 id={inputId}
                 type="file"
@@ -346,35 +342,34 @@ function UploadSheet({ template, onClose }: { template: Template; onClose: () =>
                 className="text-2 block w-full text-sm file:mr-3 file:h-11 file:cursor-pointer file:rounded-full file:border file:border-[var(--border)] file:bg-[var(--surface-2)] file:px-4 file:text-sm file:font-medium file:text-[var(--text)]"
               />
               <p className="text-3 mt-1 text-xs">
-                Required columns: {template.required_columns.join(", ")}
+                {t("Required columns: {0}", { 0: template.required_columns.join(", ") })}
               </p>
             </div>
             <Button type="submit" size="lg" disabled={!file || upload.isPending}>
-              {upload.isPending ? "Reading file…" : "Upload and preview"}
+              {upload.isPending ? t("Reading file…") : t("Upload and preview")}
             </Button>
           </form>
 
-          {upload.error ? <ErrorNote message={`Could not read the file: ${upload.error.message}`} /> : null}
+          {upload.error ? <ErrorNote message={t("Could not read the file: {0}", { 0: upload.error.message })} /> : null}
 
           {preview ? (
             <div className="space-y-4">
               <div className="surface-2 rounded-xl border px-4 py-3">
                 <p className="font-semibold">{preview.summary}</p>
                 <p className="text-3 mt-0.5 text-xs">
-                  {preview.filename} · {preview.rows_found} row{preview.rows_found === 1 ? "" : "s"} found
-                  {hasErrors ? ` · ${preview.errors.length} error${preview.errors.length === 1 ? "" : "s"}` : ""}
+                  {t("{0} · {1} row{2} found{3}", { 0: preview.filename, 1: preview.rows_found, 2: preview.rows_found === 1 ? "" : "s", 3: hasErrors ? t(" · {0} error{1}", { 0: preview.errors.length, 1: preview.errors.length === 1 ? "" : "s" }) : "" })}
                 </p>
               </div>
 
               {hasErrors ? (
                 <div>
-                  <p className="label mb-2 text-[var(--color-loss)]">Fix these in the file, then upload again</p>
+                  <p className="label mb-2 text-[var(--color-loss)]">{t("Fix these in the file, then upload again")}</p>
                   <div className="max-h-64 overflow-auto rounded-xl border">
                     <table className="w-full text-sm">
                       <thead className="surface-2 sticky top-0">
                         <tr className="border-b">
                           {["Row", "Column", "Problem"].map((h) => (
-                            <th key={h} className="label px-3 py-2 text-left whitespace-nowrap">{h}</th>
+                            <th key={h} className="label px-3 py-2 text-left whitespace-nowrap">{t(h)}</th>
                           ))}
                         </tr>
                       </thead>
@@ -395,7 +390,7 @@ function UploadSheet({ template, onClose }: { template: Template; onClose: () =>
               {preview.preview.length ? (
                 <div>
                   <p className="label mb-2">
-                    First {Math.min(10, preview.preview.length)} rows
+                    {t("First {0} rows", { 0: Math.min(10, preview.preview.length) })}
                   </p>
                   <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-xs">
@@ -426,7 +421,7 @@ function UploadSheet({ template, onClose }: { template: Template; onClose: () =>
                 </div>
               ) : null}
 
-              {confirm.error ? <ErrorNote message={`Could not import: ${confirm.error.message}`} /> : null}
+              {confirm.error ? <ErrorNote message={t("Could not import: {0}", { 0: confirm.error.message })} /> : null}
 
               <div className="flex flex-wrap items-center gap-3">
                 <Button
@@ -434,10 +429,10 @@ function UploadSheet({ template, onClose }: { template: Template; onClose: () =>
                   disabled={hasErrors || !preview.upload_id || confirm.isPending}
                   onClick={() => preview.upload_id && confirm.mutate(preview.upload_id)}
                 >
-                  {confirm.isPending ? "Importing…" : `Confirm and import ${preview.rows_found} rows`}
+                  {confirm.isPending ? t("Importing…") : t("Confirm and import {0} rows", { 0: preview.rows_found })}
                 </Button>
                 {hasErrors ? (
-                  <span className="text-3 text-xs">Confirm opens once the file has no errors.</span>
+                  <span className="text-3 text-xs">{t("Confirm opens once the file has no errors.")}</span>
                 ) : null}
               </div>
             </div>

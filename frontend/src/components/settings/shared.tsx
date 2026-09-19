@@ -9,6 +9,7 @@ import { Button, type ButtonProps } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
 import { Empty, ErrorNote, Skeleton } from "@/components/ui/misc";
 import type { MasterResource } from "@/types/api";
+import { useT, type Translator } from "@/lib/i18n";
 
 /**
  * Building blocks shared by every Settings tab.
@@ -75,6 +76,8 @@ export function toValues(row: object, fields: FieldSpec[]): FormValues {
 export function fromValues(
   values: FormValues,
   fields: FieldSpec[],
+  /** The caller's translator. Validation text is read, so it is translated. */
+  t: Translator = (source) => source,
 ): { payload: Record<string, unknown>; errors: Record<string, string> } {
   const payload: Record<string, unknown> = {};
   const errors: Record<string, string> = {};
@@ -90,23 +93,29 @@ export function fromValues(
 
     const text = typeof value === "string" ? value.trim() : "";
     if (text === "") {
-      if (field.required) errors[field.key] = `${field.label} is required.`;
+      if (field.required) errors[field.key] = t("{0} is required.", { 0: t(field.label) });
       else if (!field.omitIfBlank) payload[field.key] = null;
       continue;
     }
 
     if (field.kind === "number" || (field.kind === "select" && field.numeric)) {
       const n = Number(text);
-      if (!Number.isFinite(n)) errors[field.key] = `${field.label} must be a number.`;
-      else if (field.integer && !Number.isInteger(n)) errors[field.key] = `${field.label} must be a whole number.`;
-      else if (field.min !== undefined && n < field.min) errors[field.key] = `${field.label} cannot be below ${field.min}.`;
-      else if (field.max !== undefined && n > field.max) errors[field.key] = `${field.label} cannot be above ${field.max}.`;
+      if (!Number.isFinite(n)) errors[field.key] = t("{0} must be a number.", { 0: t(field.label) });
+      else if (field.integer && !Number.isInteger(n))
+        errors[field.key] = t("{0} must be a whole number.", { 0: t(field.label) });
+      else if (field.min !== undefined && n < field.min)
+        errors[field.key] = t("{0} cannot be below {1}.", { 0: t(field.label), 1: field.min });
+      else if (field.max !== undefined && n > field.max)
+        errors[field.key] = t("{0} cannot be above {1}.", { 0: t(field.label), 1: field.max });
       else payload[field.key] = n;
       continue;
     }
 
     if (field.kind === "password" && field.min !== undefined && text.length < field.min) {
-      errors[field.key] = `${field.label} must be at least ${field.min} characters.`;
+      errors[field.key] = t("{0} must be at least {1} characters.", {
+        0: t(field.label),
+        1: field.min,
+      });
       continue;
     }
 
@@ -129,6 +138,7 @@ export function FieldInput({
   error?: string;
   onChange: (value: string | boolean) => void;
 }) {
+  const t = useT();
   const id = `${idPrefix}-${field.key}`;
   const hintId = field.hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
@@ -147,9 +157,9 @@ export function FieldInput({
             aria-describedby={describedBy}
             className="size-5"
           />
-          <span className="text-sm font-medium">{field.label}</span>
+          <span className="text-sm font-medium">{t(field.label)}</span>
         </label>
-        {field.hint ? <p id={hintId} className="text-3 mt-1 text-xs">{field.hint}</p> : null}
+        {field.hint ? <p id={hintId} className="text-3 mt-1 text-xs">{t(field.hint)}</p> : null}
       </div>
     );
   }
@@ -157,8 +167,8 @@ export function FieldInput({
   return (
     <div className={cn(field.wide && "sm:col-span-2")}>
       <Label htmlFor={id}>
-        {field.label}
-        {field.required ? null : <span className="text-3 font-normal"> (optional)</span>}
+        {t(field.label)}
+        {field.required ? null : <span className="text-3 font-normal"> {t("(optional)")}</span>}
       </Label>
       {field.kind === "select" ? (
         <Select
@@ -172,7 +182,7 @@ export function FieldInput({
           {field.required ? null : <option value="">—</option>}
           {field.options?.map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {t(option.label)}
             </option>
           ))}
         </Select>
@@ -182,7 +192,7 @@ export function FieldInput({
           type={field.kind === "number" ? "text" : field.kind}
           inputMode={field.kind === "number" ? "decimal" : undefined}
           value={String(value)}
-          placeholder={field.placeholder}
+          placeholder={field.placeholder ? t(field.placeholder) : undefined}
           readOnly={field.readOnly}
           disabled={field.readOnly}
           autoComplete={field.kind === "password" ? "new-password" : undefined}
@@ -192,7 +202,7 @@ export function FieldInput({
           className={cn(error && "border-[var(--color-stopped)]")}
         />
       )}
-      {field.hint ? <p id={hintId} className="text-3 mt-1 text-xs leading-relaxed">{field.hint}</p> : null}
+      {field.hint ? <p id={hintId} className="text-3 mt-1 text-xs leading-relaxed">{t(field.hint)}</p> : null}
       {error ? (
         <p id={errorId} className="mt-1 text-xs font-medium text-[var(--color-loss)]">{error}</p>
       ) : null}
@@ -222,6 +232,7 @@ export function RecordForm({
   onCancel: () => void;
   children?: React.ReactNode;
 }) {
+  const t = useT();
   const [values, setValues] = useState<FormValues>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -231,7 +242,7 @@ export function RecordForm({
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        const result = fromValues(values, fields);
+        const result = fromValues(values, fields, t);
         setErrors(result.errors);
         if (Object.keys(result.errors).length === 0) onSubmit(result.payload);
       }}
@@ -250,15 +261,15 @@ export function RecordForm({
       </div>
       {children}
       {Object.keys(errors).length ? (
-        <ErrorNote message="Some fields need fixing — see the notes under them." />
+        <ErrorNote message={t("Some fields need fixing — see the notes under them.")} />
       ) : null}
       {serverError ? <ErrorNote message={serverError} /> : null}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" size="lg" disabled={busy}>
-          {busy ? "Saving…" : submitLabel}
+          {busy ? t("Saving…") : t(submitLabel)}
         </Button>
         <Button type="button" size="lg" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t("Cancel")}
         </Button>
       </div>
     </form>
@@ -293,12 +304,17 @@ export function Toolbar({
   onAdd?: () => void;
   children?: React.ReactNode;
 }) {
+  const t = useT();
   const toggleId = `show-inactive-${title.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="display text-lg font-bold">{title}</h2>
-        {hint ? <p className="text-2 mt-0.5 max-w-2xl text-sm leading-relaxed">{hint}</p> : null}
+        <h2 className="display text-lg font-bold">{t(title)}</h2>
+        {typeof hint === "string" ? (
+          <p className="text-2 mt-0.5 max-w-2xl text-sm leading-relaxed">{t(hint)}</p>
+        ) : hint ? (
+          <p className="text-2 mt-0.5 max-w-2xl text-sm leading-relaxed">{hint}</p>
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {children}
@@ -314,13 +330,13 @@ export function Toolbar({
               onChange={(e) => onShowInactive(e.target.checked)}
               className="size-4"
             />
-            {inactiveLabel}
+            {t(inactiveLabel)}
           </label>
         ) : null}
         {onAdd ? (
           <Button size="lg" onClick={onAdd}>
             <Plus className="size-4" />
-            {addLabel ?? "Add"}
+            {addLabel ? t(addLabel) : t("Add")}
           </Button>
         ) : null}
       </div>
@@ -345,6 +361,7 @@ export function DataTable<T extends { id: string }>({
   actions?: (row: T) => React.ReactNode;
   inactive?: (row: T) => boolean;
 }) {
+  const t = useT();
   return (
     <div className="surface elev-1 overflow-x-auto rounded-[var(--radius-card)] border">
       <table className="w-full text-sm">
@@ -352,11 +369,11 @@ export function DataTable<T extends { id: string }>({
           <tr className="border-b">
             {columns.map((col) => (
               <th key={col.header} className="label px-4 py-3 text-left whitespace-nowrap">
-                {col.header}
+                {t(col.header)}
               </th>
             ))}
             {actions ? <th className="label px-4 py-3 text-right">
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">{t("Actions")}</span>
             </th> : null}
           </tr>
         </thead>
@@ -385,7 +402,8 @@ export function DataTable<T extends { id: string }>({
 }
 
 export function ActiveBadge({ active }: { active: boolean }) {
-  return active ? <Badge variant="recovered">Active</Badge> : <Badge variant="neutral">Inactive</Badge>;
+  const t = useT();
+  return active ? <Badge variant="recovered">{t("Active")}</Badge> : <Badge variant="neutral">{t("Inactive")}</Badge>;
 }
 
 /** Loading, failed and empty are three different answers; this keeps them apart. */
@@ -406,32 +424,34 @@ export function ListState({
   onRetry?: () => void;
   children: React.ReactNode;
 }) {
+  const t = useT();
   if (loading) return <Skeleton className="h-64" />;
   if (error) {
     return (
       <div className="space-y-3">
-        <ErrorNote message={`Could not load this list: ${error.message}`} />
+        <ErrorNote message={t("Could not load this list: {0}", { 0: error.message })} />
         {onRetry ? (
           <Button size="lg" variant="outline" onClick={onRetry}>
-            Try again
+            {t("Try again")}
           </Button>
         ) : null}
       </div>
     );
   }
-  if (empty) return <Empty title={emptyTitle} hint={emptyHint} />;
+  if (empty) return <Empty title={t(emptyTitle)} hint={emptyHint ? t(emptyHint) : undefined} />;
   return <>{children}</>;
 }
 
 export function Notice({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  const t = useT();
   return (
     <div
       role="status"
       className="surface-2 rise mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2 text-sm"
     >
-      <span>{message}</span>
+      <span>{t(message)}</span>
       <Button size="sm" variant="ghost" className="h-11" onClick={onDismiss}>
-        Dismiss
+        {t("Dismiss")}
       </Button>
     </div>
   );

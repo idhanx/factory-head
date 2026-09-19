@@ -10,6 +10,7 @@ import { ErrorNote } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import type { CostRate, CostRateInput } from "@/types/api";
 import { DataTable, ListState, Notice, Toolbar } from "./shared";
+import { useT } from "@/lib/i18n";
 
 /**
  * Effective-dated cost rates.
@@ -47,6 +48,7 @@ function currentIds(rates: CostRate[]): Set<string> {
 }
 
 export function CostRatesTab() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -63,12 +65,12 @@ export function CostRatesTab() {
   return (
     <div>
       <Toolbar
-        title="Cost rates"
+        title={t("Cost rates")}
         hint={
           <>
-            Rates are dated. Adding a rate applies it from its start date onwards —{" "}
-            <strong>past stops keep the rate they were costed with</strong>, so last month&apos;s
-            figures and every action&apos;s baseline stay exactly as they were.
+            {t("Rates are dated. Adding a rate applies it from its start date onwards —")}{" "}
+            <strong>{t("past stops keep the rate they were costed with")}</strong>
+            {t(", so last month’s figures and every action’s baseline stay exactly as they were.")}
           </>
         }
         addLabel="Add rate"
@@ -81,14 +83,14 @@ export function CostRatesTab() {
         error={rates.error}
         empty={rows.length === 0}
         emptyTitle="No cost rates yet"
-        emptyHint="Until rates are added, downtime is costed with the default rates for each section."
+        emptyHint={t("Until rates are added, downtime is costed with the default rates for each section.")}
         onRetry={() => void rates.refetch()}
       >
         <DataTable
           rows={rows}
           inactive={(r) => !inUse.has(r.id) && r.effective_from <= today()}
           columns={[
-            { header: "Applies to", cell: (r) => <span className="font-semibold">{SCOPES.find((s) => s.value === r.scope)?.label ?? r.scope}</span> },
+            { header: "Applies to", cell: (r) => <span className="font-semibold">{t(SCOPES.find((s) => s.value === r.scope)?.label ?? r.scope)}</span> },
             { header: "Reference", cell: (r) => <span className="capitalize">{r.reference}</span> },
             { header: "Machine ₹/h", cell: (r) => rupees(r.machine_rate_rupees) },
             { header: "Labour ₹/h", cell: (r) => rupees(r.labour_rate_rupees) },
@@ -100,11 +102,11 @@ export function CostRatesTab() {
                 <span className="flex items-center gap-2 whitespace-nowrap">
                   <span className="tnum">{r.effective_from}</span>
                   {inUse.has(r.id) ? (
-                    <Badge variant="recovered">In use</Badge>
+                    <Badge variant="recovered">{t("In use")}</Badge>
                   ) : r.effective_from > today() ? (
-                    <Badge variant="accent">Upcoming</Badge>
+                    <Badge variant="accent">{t("Upcoming")}</Badge>
                   ) : (
-                    <Badge variant="neutral">Replaced</Badge>
+                    <Badge variant="neutral">{t("Replaced")}</Badge>
                   )}
                 </span>
               ),
@@ -119,7 +121,7 @@ export function CostRatesTab() {
           onSaved={(rate) => {
             void queryClient.invalidateQueries({ queryKey: ["settings", "cost-rates"] });
             setAdding(false);
-            setNotice(`Rate for ${rate.reference} added from ${rate.effective_from}.`);
+            setNotice(t("Rate for {0} added from {1}.", { 0: rate.reference, 1: rate.effective_from }));
           }}
         />
       ) : null}
@@ -128,6 +130,7 @@ export function CostRatesTab() {
 }
 
 function AddRateSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (rate: CostRate) => void }) {
+  const t = useT();
   const [scope, setScope] = useState<CostRate["scope"]>("cost_family");
   const [reference, setReference] = useState("");
   const [machine, setMachine] = useState("");
@@ -155,18 +158,18 @@ function AddRateSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (rat
   const money = (value: string) => (value.trim() === "" ? 0 : Number(value));
 
   return (
-    <Sheet title="Add a cost rate" subtitle="Applies from its start date. Earlier events are not re-costed." onClose={onClose}>
+    <Sheet title={t("Add a cost rate")} subtitle={t("Applies from its start date. Earlier events are not re-costed.")} onClose={onClose}>
       <form
         noValidate
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
           const ref = scope === "plant" ? "plant" : reference.trim();
-          if (!ref) return setInvalid(scope === "section" ? "Pick the section." : "Enter the machine family code.");
+          if (!ref) return setInvalid(scope === "section" ? t("Pick the section.") : t("Enter the machine family code."));
           const values = [machine, labour, overhead].map(money);
-          if (values.some((v) => !Number.isFinite(v) || v < 0)) return setInvalid("Rates must be numbers of 0 or more.");
-          if (values.every((v) => v === 0)) return setInvalid("Enter at least one rate above 0.");
-          if (!from) return setInvalid("Pick the date the rate starts.");
+          if (values.some((v) => !Number.isFinite(v) || v < 0)) return setInvalid(t("Rates must be numbers of 0 or more."));
+          if (values.every((v) => v === 0)) return setInvalid(t("Enter at least one rate above 0."));
+          if (!from) return setInvalid(t("Pick the date the rate starts."));
           setInvalid(null);
           save.mutate({
             scope,
@@ -181,7 +184,7 @@ function AddRateSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (rat
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="rate-scope">Applies to</Label>
+            <Label htmlFor="rate-scope">{t("Applies to")}</Label>
             <Select
               id="rate-scope"
               value={scope}
@@ -194,14 +197,14 @@ function AddRateSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (rat
                 <option key={s.value} value={s.value}>{s.label}</option>
               ))}
             </Select>
-            <p className="text-3 mt-1 text-xs">{SCOPES.find((s) => s.value === scope)?.hint}</p>
+            <p className="text-3 mt-1 text-xs">{t(SCOPES.find((s) => s.value === scope)?.hint ?? "")}</p>
           </div>
 
           {scope === "section" ? (
             <div>
-              <Label htmlFor="rate-reference">Section</Label>
+              <Label htmlFor="rate-reference">{t("Section")}</Label>
               <Select id="rate-reference" value={reference} onChange={(e) => setReference(e.target.value)}>
-                <option value="">Select…</option>
+                <option value="">{t("Select…")}</option>
                 {SECTIONS.map((s) => (
                   <option key={s} value={s} className="capitalize">{s[0].toUpperCase() + s.slice(1)}</option>
                 ))}
@@ -209,13 +212,13 @@ function AddRateSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (rat
             </div>
           ) : scope === "cost_family" ? (
             <div>
-              <Label htmlFor="rate-reference">Machine family code</Label>
+              <Label htmlFor="rate-reference">{t("Machine family code")}</Label>
               <Input
                 id="rate-reference"
                 list="rate-families"
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
-                placeholder={families[0] ?? "CNC-LATHE"}
+                placeholder={families[0] ?? t("CNC-LATHE")}
               />
               <datalist id="rate-families">
                 {families.map((f) => <option key={f} value={f} />)}
@@ -223,33 +226,33 @@ function AddRateSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (rat
             </div>
           ) : (
             <div>
-              <Label htmlFor="rate-reference">Reference</Label>
+              <Label htmlFor="rate-reference">{t("Reference")}</Label>
               <Input id="rate-reference" value="plant" readOnly disabled />
             </div>
           )}
 
           <div>
-            <Label htmlFor="rate-machine">Machine rate (₹ per hour)</Label>
+            <Label htmlFor="rate-machine">{t("Machine rate (₹ per hour)")}</Label>
             <Input id="rate-machine" inputMode="decimal" value={machine} onChange={(e) => setMachine(e.target.value)} placeholder="0" />
           </div>
           <div>
-            <Label htmlFor="rate-labour">Labour rate (₹ per hour)</Label>
+            <Label htmlFor="rate-labour">{t("Labour rate (₹ per hour)")}</Label>
             <Input id="rate-labour" inputMode="decimal" value={labour} onChange={(e) => setLabour(e.target.value)} placeholder="0" />
           </div>
           <div>
-            <Label htmlFor="rate-overhead">Overhead rate (₹ per hour)</Label>
+            <Label htmlFor="rate-overhead">{t("Overhead rate (₹ per hour)")}</Label>
             <Input id="rate-overhead" inputMode="decimal" value={overhead} onChange={(e) => setOverhead(e.target.value)} placeholder="0" />
           </div>
           <div>
-            <Label htmlFor="rate-source">Where the number came from</Label>
+            <Label htmlFor="rate-source">{t("Where the number came from")}</Label>
             <Select id="rate-source" value={source} onChange={(e) => setSource(e.target.value as CostRate["source"])}>
-              <option value="measured">Measured — from the plant&apos;s own accounts</option>
-              <option value="derived">Derived — worked out from other figures</option>
-              <option value="default">Default — an industry estimate</option>
+              <option value="measured">{t("Measured — from the plant's own accounts")}</option>
+              <option value="derived">{t("Derived — worked out from other figures")}</option>
+              <option value="default">{t("Default — an industry estimate")}</option>
             </Select>
           </div>
           <div>
-            <Label htmlFor="rate-from">Starts on</Label>
+            <Label htmlFor="rate-from">{t("Starts on")}</Label>
             <Input id="rate-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
         </div>
@@ -259,10 +262,10 @@ function AddRateSheet({ onClose, onSaved }: { onClose: () => void; onSaved: (rat
 
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="lg" disabled={save.isPending}>
-            {save.isPending ? "Saving…" : "Add rate"}
+            {save.isPending ? t("Saving…") : t("Add rate")}
           </Button>
           <Button type="button" size="lg" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </form>

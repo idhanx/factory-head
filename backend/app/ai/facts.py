@@ -152,6 +152,22 @@ async def build_shift_facts(
     return bundle
 
 
+#: Questions that really are about the state of the plant right now. Anything
+#: that matches none of the branches below is answered with today's numbers too,
+#: but is told so rather than being given them as the answer.
+TODAY_WORDS = (
+    "today",
+    "now",
+    "current",
+    "currently",
+    "right now",
+    "how are we",
+    "how is the plant",
+    "this shift",
+    "status",
+)
+
+
 async def build_question_facts(
     session: AsyncSession, *, plant: Plant, question: str, as_of: date
 ) -> tuple[FactBundle, str]:
@@ -247,7 +263,14 @@ async def build_question_facts(
                 )
 
     else:
-        intent = "today"
+        # Today is the default because it is what most unprompted questions are
+        # about. But a question that matched nothing at all is not a question
+        # about today, and answering "what is our ROI?" with this morning's
+        # downtime — stated as though it were the answer — is the same
+        # confidently-irrelevant reply the memory branch above exists to avoid.
+        # The numbers still go out; what changes is that the answer says they
+        # are not what was asked for.
+        intent = "today" if any(word in text for word in TODAY_WORDS) else "unrecognised"
         report = await ranked_loss_report(session, plant=plant, start=as_of, end=as_of)
         bundle.facts.update(
             {
@@ -256,6 +279,13 @@ async def build_question_facts(
             }
         )
         bundle.evidence = report.recoverable[:5]
+        if intent == "unrecognised":
+            bundle.limits.append(
+                "That question was not understood, so this is today's position "
+                "rather than an answer to it. Losses for a period, defects and "
+                "quality, why a machine keeps stopping, and what fixed something "
+                "last time can all be asked for by name."
+            )
 
     return bundle, intent
 

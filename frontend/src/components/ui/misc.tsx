@@ -1,5 +1,8 @@
+"use client";
+
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn("shimmer surface-2 rounded-lg", className)} />;
@@ -21,6 +24,7 @@ export function Empty({
   icon?: React.ReactNode;
   action?: React.ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-dashed px-6 py-16 text-center">
       {icon ? (
@@ -28,21 +32,25 @@ export function Empty({
           {icon}
         </div>
       ) : null}
-      <p className="font-semibold">{title}</p>
-      {hint ? <p className="text-2 max-w-md text-sm leading-relaxed">{hint}</p> : null}
+      <p className="font-semibold">{t(title)}</p>
+      {hint ? <p className="text-2 max-w-md text-sm leading-relaxed">{t(hint)}</p> : null}
       {action}
     </div>
   );
 }
 
 export function ErrorNote({ message }: { message: string }) {
+  // Messages reach here from module-level code (`lib/api.ts`) that cannot call
+  // a hook, so the translation happens at the point of display instead. Text
+  // the server wrote has no dictionary entry and passes through as sent.
+  const t = useT();
   return (
     <div
       role="alert"
       className="flex items-start gap-2.5 rounded-lg border border-[color-mix(in_oklab,var(--color-stopped)_35%,transparent)] bg-[var(--color-stopped-dim)] px-4 py-3 text-sm text-[var(--color-loss)]"
     >
       <span aria-hidden className="mt-0.5 shrink-0 font-bold">!</span>
-      <span>{message}</span>
+      <span>{t(message)}</span>
     </div>
   );
 }

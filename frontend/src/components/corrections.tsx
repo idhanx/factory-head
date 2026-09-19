@@ -12,6 +12,7 @@ import { Sheet } from "@/components/ui/sheet";
 import type {
   AuditEntityType, DowntimeCorrection, DowntimeEvent, QualityCorrection, ShiftEntryProduction, ShiftEntryQuality,
 } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * Correcting a recorded entry after the fact.
@@ -46,32 +47,34 @@ function invalidateAfterCorrection(queryClient: ReturnType<typeof useQueryClient
 }
 
 function WhyField({ id, value, onChange }: { id: string; value: string; onChange: (value: string) => void }) {
+  const t = useT();
   return (
     <div>
-      <Label htmlFor={id}>Why is this being corrected?</Label>
+      <Label htmlFor={id}>{t("Why is this being corrected?")}</Label>
       <Textarea
         id={id}
         rows={2}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Stop was logged against CNC-3, it was CNC-4"
+        placeholder={t("Stop was logged against CNC-3, it was CNC-4")}
         aria-describedby={`${id}-hint`}
       />
       <p id={`${id}-hint`} className="text-3 mt-1 text-xs">
-        Required. Saved to the audit log with the old and new values.
+        {t("Required. Saved to the audit log with the old and new values.")}
       </p>
     </div>
   );
 }
 
 function SheetButtons({ busy, onClose }: { busy: boolean; onClose: () => void }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap gap-2">
       <Button type="submit" size="touch" disabled={busy}>
-        {busy ? "Saving…" : "Save correction"}
+        {busy ? t("Saving…") : t("Save correction")}
       </Button>
       <Button type="button" size="touch" variant="ghost" onClick={onClose}>
-        Cancel
+        {t("Cancel")}
       </Button>
     </div>
   );
@@ -80,6 +83,7 @@ function SheetButtons({ busy, onClose }: { busy: boolean; onClose: () => void })
 // ---------------------------------------------------------------------------
 
 export function DowntimeCorrectionSheet({ event, onClose }: { event: DowntimeEvent; onClose: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const reasons = useQuery({ queryKey: ["reasons"], queryFn: api.reasonCodes });
   const [reasonId, setReasonId] = useState(event.reason_code_id ?? "");
@@ -99,8 +103,8 @@ export function DowntimeCorrectionSheet({ event, onClose }: { event: DowntimeEve
 
   return (
     <Sheet
-      title={`Correct stop · ${event.station_code ?? "station"}`}
-      subtitle={`${event.reason_label ?? "No reason"} · ${formatClock(event.started_at)}–${formatClock(event.ended_at)}`}
+      title={t("Correct stop · {0}", { 0: event.station_code ?? "station" })}
+      subtitle={`${event.reason_label ?? t("No reason")} · ${formatClock(event.started_at)}–${formatClock(event.ended_at)}`}
       onClose={onClose}
     >
       <form
@@ -114,22 +118,22 @@ export function DowntimeCorrectionSheet({ event, onClose }: { event: DowntimeEve
           if (endedAt && endedAt !== toLocalInput(event.ended_at)) payload.ended_at = fromLocalInput(endedAt);
           if (note.trim() !== (event.note ?? "")) payload.note = note.trim();
 
-          if (Object.keys(payload).length === 1) return setInvalid("Nothing has been changed yet.");
+          if (Object.keys(payload).length === 1) return setInvalid(t("Nothing has been changed yet."));
           if (startedAt && endedAt && new Date(endedAt) <= new Date(startedAt)) {
-            return setInvalid("The end time must be after the start time.");
+            return setInvalid(t("The end time must be after the start time."));
           }
-          if (why.trim().length < MIN_WHY) return setInvalid(`Say why in at least ${MIN_WHY} characters.`);
+          if (why.trim().length < MIN_WHY) return setInvalid(t("Say why in at least {0} characters.", { 0: MIN_WHY }));
           setInvalid(null);
           save.mutate(payload);
         }}
       >
         <div>
-          <Label htmlFor="fix-dt-reason">Reason</Label>
+          <Label htmlFor="fix-dt-reason">{t("Reason")}</Label>
           {reasons.error ? (
-            <ErrorNote message={`Could not load reason codes: ${reasons.error.message}`} />
+            <ErrorNote message={t("Could not load reason codes: {0}", { 0: reasons.error.message })} />
           ) : (
             <Select id="fix-dt-reason" value={reasonId} disabled={reasons.isLoading} onChange={(e) => setReasonId(e.target.value)}>
-              <option value="">{reasons.isLoading ? "Loading…" : "No reason"}</option>
+              <option value="">{reasons.isLoading ? t("Loading…") : t("No reason")}</option>
               {(reasons.data ?? []).map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.label} ({r.recoverability === "R" ? "recoverable" : "structural"})
@@ -140,11 +144,11 @@ export function DowntimeCorrectionSheet({ event, onClose }: { event: DowntimeEve
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="fix-dt-start">Stopped at</Label>
+            <Label htmlFor="fix-dt-start">{t("Stopped at")}</Label>
             <Input id="fix-dt-start" type="datetime-local" value={startedAt} onChange={(e) => setStartedAt(e.target.value)} />
           </div>
           <div>
-            <Label htmlFor="fix-dt-end">Running again at</Label>
+            <Label htmlFor="fix-dt-end">{t("Running again at")}</Label>
             <Input
               id="fix-dt-end"
               type="datetime-local"
@@ -154,16 +158,18 @@ export function DowntimeCorrectionSheet({ event, onClose }: { event: DowntimeEve
               aria-describedby={event.ended_at ? undefined : "fix-dt-end-hint"}
             />
             {!event.ended_at ? (
-              <p id="fix-dt-end-hint" className="text-3 mt-1 text-xs">Still open — close it from the grid.</p>
+              <p id="fix-dt-end-hint" className="text-3 mt-1 text-xs">
+                {t("Still open — close it from the grid.")}
+              </p>
             ) : null}
           </div>
         </div>
         <div>
-          <Label htmlFor="fix-dt-note">Note (optional)</Label>
+          <Label htmlFor="fix-dt-note">{t("Note (optional)")}</Label>
           <Textarea id="fix-dt-note" rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
         <WhyField id="fix-dt-why" value={why} onChange={setWhy} />
-        <p className="text-3 text-xs">The cost is recomputed with the rates frozen when the stop happened.</p>
+        <p className="text-3 text-xs">{t("The cost is recomputed with the rates frozen when the stop happened.")}</p>
         {invalid ? <ErrorNote message={invalid} /> : null}
         {save.error ? <ErrorNote message={save.error.message} /> : null}
         <SheetButtons busy={save.isPending} onClose={onClose} />
@@ -175,6 +181,7 @@ export function DowntimeCorrectionSheet({ event, onClose }: { event: DowntimeEve
 // ---------------------------------------------------------------------------
 
 export function ProductionCorrectionSheet({ entry, onClose }: { entry: ShiftEntryProduction; onClose: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [count, setCount] = useState(String(entry.count));
   const [why, setWhy] = useState("");
@@ -190,8 +197,8 @@ export function ProductionCorrectionSheet({ entry, onClose }: { entry: ShiftEntr
 
   return (
     <Sheet
-      title={`Correct count · ${entry.station_code ?? "station"}`}
-      subtitle={`${entry.count} parts entered at ${formatClock(entry.recorded_at)}`}
+      title={t("Correct count · {0}", { 0: entry.station_code ?? "station" })}
+      subtitle={t("{0} parts entered at {1}", { 0: entry.count, 1: formatClock(entry.recorded_at) })}
       onClose={onClose}
     >
       <form
@@ -200,15 +207,15 @@ export function ProductionCorrectionSheet({ entry, onClose }: { entry: ShiftEntr
         onSubmit={(e) => {
           e.preventDefault();
           const value = Number.parseInt(count, 10);
-          if (!Number.isFinite(value) || value < 0) return setInvalid("Enter the count as a whole number, 0 or more.");
-          if (value === entry.count) return setInvalid("That is the count already recorded.");
-          if (why.trim().length < MIN_WHY) return setInvalid(`Say why in at least ${MIN_WHY} characters.`);
+          if (!Number.isFinite(value) || value < 0) return setInvalid(t("Enter the count as a whole number, 0 or more."));
+          if (value === entry.count) return setInvalid(t("That is the count already recorded."));
+          if (why.trim().length < MIN_WHY) return setInvalid(t("Say why in at least {0} characters.", { 0: MIN_WHY }));
           setInvalid(null);
           save.mutate(value);
         }}
       >
         <div className="max-w-xs">
-          <Label htmlFor="fix-prod-count">Parts in this entry</Label>
+          <Label htmlFor="fix-prod-count">{t("Parts in this entry")}</Label>
           <Input
             id="fix-prod-count"
             inputMode="numeric"
@@ -229,6 +236,7 @@ export function ProductionCorrectionSheet({ entry, onClose }: { entry: ShiftEntr
 // ---------------------------------------------------------------------------
 
 export function QualityCorrectionSheet({ entry, onClose }: { entry: ShiftEntryQuality; onClose: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const defectCodes = useQuery({ queryKey: ["defects"], queryFn: api.defectCodes });
   const [good, setGood] = useState(String(entry.good_count));
@@ -261,8 +269,8 @@ export function QualityCorrectionSheet({ entry, onClose }: { entry: ShiftEntryQu
 
   return (
     <Sheet
-      title={`Correct quality batch · ${entry.part_number ?? "part"}`}
-      subtitle={`${entry.good_count} good, ${entry.reject_count} rejected · ${formatClock(entry.recorded_at)}`}
+      title={t("Correct quality batch · {0}", { 0: entry.part_number ?? "part" })}
+      subtitle={t("{0} good, {1} rejected · {2}", { 0: entry.good_count, 1: entry.reject_count, 2: formatClock(entry.recorded_at) })}
       onClose={onClose}
     >
       <form
@@ -282,57 +290,57 @@ export function QualityCorrectionSheet({ entry, onClose }: { entry: ShiftEntryQu
             nextDefects.some(([code, count]) => original[code] !== count);
           if (changedDefects) payload.defects = nextDefects.map(([code, count]) => ({ code, count }));
 
-          if (Object.keys(payload).length === 1) return setInvalid("Nothing has been changed yet.");
-          if (n(rework) > n(good)) return setInvalid("Reworked parts are counted inside the good parts — reworked cannot be more than good.");
+          if (Object.keys(payload).length === 1) return setInvalid(t("Nothing has been changed yet."));
+          if (n(rework) > n(good)) return setInvalid(t("Reworked parts are counted inside the good parts — reworked cannot be more than good."));
           const assigned = nextDefects.reduce((sum, [, count]) => sum + count, 0);
           if (assigned > n(reject) + n(rework)) {
-            return setInvalid(`${assigned} parts have a defect code, but only ${n(reject) + n(rework)} were rejected or reworked.`);
+            return setInvalid(t("{0} parts have a defect code, but only {1} were rejected or reworked.", { 0: assigned, 1: n(reject) + n(rework) }));
           }
-          if (why.trim().length < MIN_WHY) return setInvalid(`Say why in at least ${MIN_WHY} characters.`);
+          if (why.trim().length < MIN_WHY) return setInvalid(t("Say why in at least {0} characters.", { 0: MIN_WHY }));
           setInvalid(null);
           save.mutate(payload);
         }}
       >
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <Label htmlFor="fix-q-good">Good</Label>
+            <Label htmlFor="fix-q-good">{t("Good")}</Label>
             <Input id="fix-q-good" inputMode="numeric" value={good} onChange={(e) => setGood(digits(e.target.value))} className="money text-lg font-semibold" />
           </div>
           <div>
-            <Label htmlFor="fix-q-reject">Rejected</Label>
+            <Label htmlFor="fix-q-reject">{t("Rejected")}</Label>
             <Input id="fix-q-reject" inputMode="numeric" value={reject} onChange={(e) => setReject(digits(e.target.value))} className="money text-lg font-semibold" />
           </div>
           <div>
-            <Label htmlFor="fix-q-rework">Of the good, reworked</Label>
+            <Label htmlFor="fix-q-rework">{t("Of the good, reworked")}</Label>
             <Input id="fix-q-rework" inputMode="numeric" value={rework} onChange={(e) => setRework(digits(e.target.value))} className="money text-lg font-semibold" />
           </div>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="fix-q-disposition">Rejected parts</Label>
+            <Label htmlFor="fix-q-disposition">{t("Rejected parts")}</Label>
             <Select id="fix-q-disposition" value={disposition} onChange={(e) => setDisposition(e.target.value)}>
-              <option value="scrap">Scrap</option>
-              <option value="use_as_is">Use as is</option>
+              <option value="scrap">{t("Scrap")}</option>
+              <option value="use_as_is">{t("Use as is")}</option>
             </Select>
           </div>
           <div>
-            <Label htmlFor="fix-q-rework-min">Rework minutes (optional)</Label>
+            <Label htmlFor="fix-q-rework-min">{t("Rework minutes (optional)")}</Label>
             <Input
               id="fix-q-rework-min"
               inputMode="numeric"
               value={reworkMinutes}
-              placeholder="Leave blank to keep"
+              placeholder={t("Leave blank to keep")}
               onChange={(e) => setReworkMinutes(digits(e.target.value))}
             />
           </div>
         </div>
 
         <fieldset>
-          <legend className="mb-1.5 text-sm font-medium">Defect codes</legend>
+          <legend className="mb-1.5 text-sm font-medium">{t("Defect codes")}</legend>
           {defectCodes.isLoading ? (
             <Skeleton className="h-20" />
           ) : defectCodes.error ? (
-            <ErrorNote message={`Could not load defect codes: ${defectCodes.error.message}`} />
+            <ErrorNote message={t("Could not load defect codes: {0}", { 0: defectCodes.error.message })} />
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {codes.map((d) => (
@@ -366,6 +374,7 @@ export function QualityCorrectionSheet({ entry, onClose }: { entry: ShiftEntryQu
 
 /** The audit trail for one entry. Loads only when opened. Owners and consultants. */
 export function AuditTrail({ entityType, entityId }: { entityType: AuditEntityType; entityId: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const trail = useQuery({
     queryKey: ["audit", entityType, entityId],
@@ -382,15 +391,15 @@ export function AuditTrail({ entityType, entityId }: { entityType: AuditEntityTy
         className="text-2 flex min-h-11 items-center gap-1.5 text-xs font-medium hover:text-[var(--text)]"
       >
         <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-        History
+        {t("History")}
       </button>
       {open ? (
         trail.isLoading ? (
           <Skeleton className="h-16" />
         ) : trail.error ? (
-          <ErrorNote message={`Could not load the history: ${trail.error.message}`} />
+          <ErrorNote message={t("Could not load the history: {0}", { 0: trail.error.message })} />
         ) : (trail.data ?? []).length === 0 ? (
-          <p className="text-3 pb-2 text-xs">No changes recorded — this is the entry as it was first made.</p>
+          <p className="text-3 pb-2 text-xs">{t("No changes recorded — this is the entry as it was first made.")}</p>
         ) : (
           <ol className="surface-2 space-y-2 rounded-xl border p-3">
             {(trail.data ?? []).map((item) => {

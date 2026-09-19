@@ -187,6 +187,12 @@ export interface Escalation {
   level: number;
   status: "pending" | "sent" | "failed" | "cancelled" | string;
   channel: string;
+  /**
+   * The role this rung was aimed at. §3 Layer 2: "the system picks the
+   * recipient from the reason code" — a material wait to Stores, a breakdown
+   * to Maintenance. Stored on the row so each desk's inbox is genuinely theirs.
+   */
+  route: EscalationRoute | "plant_head" | "supervisor" | null;
   downtime_event_id: string;
   station_code: string | null;
   message: string | null;
@@ -611,30 +617,393 @@ export interface AuditPack {
   created_at: string;
 }
 
+/* --- Kaizen AI (Plugin Edition) -------------------------------------------
+ *
+ * Money crosses the wire as integer paise plus a pre-formatted display string.
+ * The hard / soft split is never merged into one figure: hard is cash that hits
+ * the P&L, soft is real hours or units recovered but not yet cash, and the two
+ * are reported side by side. Merging them is the one thing both specifications
+ * are written to prevent.
+ */
+
+export type KaizenTrack = "quick" | "full";
+
+export type KaizenStatus =
+  | "draft"
+  | "submitted"
+  | "scored"
+  | "approved"
+  | "accepted"
+  | "rejected"
+  | "implemented"
+  | "verified"
+  | "duplicate";
+
+export type KaizenVerdict = "HIGH" | "MEDIUM" | "LOW";
+
+export type VisionCategory =
+  | "housekeeping"
+  | "safety_hazard"
+  | "leak_or_spill"
+  | "missing_label"
+  | "obstruction";
+
+/** A camera suggestion. Nothing reaches a supervisor until `accepted` is true. */
+export interface VisionFinding {
+  category: VisionCategory;
+  text: string;
+  accepted: boolean;
+}
+
+export interface KaizenContext {
+  station_id: string | null;
+  station_code: string | null;
+  station_name: string | null;
+  line: string | null;
+  department: string | null;
+  job_order_id: string | null;
+  job_number: string | null;
+  part_id: string | null;
+  part_number: string | null;
+  operation_id: string | null;
+  operation_code: string | null;
+  bottleneck_factor: number | null;
+  is_bottleneck: boolean | null;
+  known: string[];
+  prompt: string;
+}
+
+export interface KaizenQuestion {
+  key: string;
+  text: string;
+  kind: "choice" | "number" | "text" | "boolean";
+  options: string[];
+  values: number[];
+  unit: string | null;
+  depends_on: string[] | null;
+  optional: boolean;
+}
+
+export interface KaizenAnswer {
+  key: string;
+  question?: string | null;
+  answer: string | number | boolean | null;
+  unit?: string | null;
+  source?: "operator" | "core";
+}
+
+export interface KaizenSaving {
+  hard_paise: number;
+  hard_display: string;
+  soft_paise: number;
+  soft_display: string;
+  basis: string | null;
+  provisional: boolean;
+  provisional_note: string | null;
+  missing_rate_key?: string | null;
+  missing_rate_label?: string | null;
+}
+
+export interface CostOfDoingNothing {
+  per_year_paise: number;
+  per_year_display: string;
+  per_month_paise: number;
+  per_month_display: string;
+  per_day_paise: number;
+  per_day_display: string;
+  since_submitted_paise: number;
+  since_submitted_display: string;
+  days_waiting: number;
+}
+
+export interface KaizenImpact {
+  saving: KaizenSaving;
+  stars: Partial<Record<"safety" | "quality" | "delivery" | "morale" | "compliance", number>>;
+  effort_score: number;
+  impact_score: number;
+  investment_paise: number;
+  investment_display: string;
+  investment_is_estimate: boolean;
+  payback_months: number | null;
+  roi_percent: number | null;
+  cost_of_doing_nothing: CostOfDoingNothing;
+}
+
+export interface KaizenHistoryTier {
+  scope: string;
+  label: string;
+  events: number;
+  minutes: number;
+  cost_paise: number;
+  cost_display: string;
+}
+
+export interface KaizenLinkedAction {
+  action_id: string;
+  reference: string;
+  title: string;
+  owner_name: string | null;
+  due_date: string | null;
+  state: string;
+  closed_on: string | null;
+}
+
+/** Step 5A. Every rupee here was recorded by Core, never estimated. */
+export interface KaizenHistory {
+  found: boolean;
+  matched_on: "reason_code" | "defect_code" | "semantic" | "none";
+  subject: string;
+  window_days: number;
+  tiers: KaizenHistoryTier[];
+  events: number;
+  minutes: number;
+  cost_paise: number;
+  cost_display: string;
+  rank: number | null;
+  ranked_of: number;
+  last_occurred_on: string | null;
+  events_recent: number;
+  events_prior: number;
+  trend: "rising" | "falling" | "flat";
+  annual_run_rate_paise: number;
+  annual_run_rate_display: string;
+  open_action: KaizenLinkedAction | null;
+  recurrence_of: KaizenLinkedAction | null;
+  memory: Array<{
+    id: string;
+    what_fixed_it: string;
+    check_first_next_time: string | null;
+    fixed_by_name: string | null;
+    occurred_on: string | null;
+  }>;
+  message: string;
+}
+
+export interface KaizenChallenge {
+  alternative: string;
+  rough_cost_paise: number;
+  question: string;
+  offered: boolean;
+  chosen: "mine" | "alternative" | "both" | null;
+  dismissed_reason: string | null;
+}
+
+export interface KaizenForecast {
+  probability: number;
+  expected_days: number;
+  obstacles: Array<{ risk: "high" | "medium" | "none"; what: string; detail: string }>;
+  advice: string | null;
+  learned: boolean;
+}
+
 export interface KaizenIdea {
   id: string;
   reference: string;
+  track: KaizenTrack;
   title: string;
   description: string;
+  voice_transcript: string | null;
+
   submitted_by_name: string;
+  credited_name: string;
+  credited_operator_id: string | null;
+  board: "shopfloor" | "support";
+  department: string | null;
+  submitted_on: string | null;
+
   station_code: string | null;
-  status: "submitted" | "scored" | "accepted" | "rejected" | "implemented";
-  estimated_annual_saving_paise: number;
-  estimated_annual_saving_display: string;
-  impact_score: number;
-  effort_score: number;
+  line: string | null;
+  part_number: string | null;
+  reason_label: string | null;
+  defect_label: string | null;
+  unknown_station_note: string | null;
+
+  category: string | null;
+  category_label: string | null;
+  saving_type: string | null;
+  status: KaizenStatus;
+  /** A verdict, never a number — §11.2. The 0-100 score is deliberately hidden. */
+  priority_verdict: KaizenVerdict | null;
+  safety_flagged: boolean;
+  is_recurrence: boolean;
+
+  impact: KaizenImpact;
+  history: KaizenHistory | null;
+  similar: Array<{
+    id: string;
+    reference: string;
+    title: string;
+    status: string;
+    similarity: number;
+    verified_saving_display: string;
+    action_id: string | null;
+  }> | null;
+  challenge: KaizenChallenge | null;
+  forecast: KaizenForecast | null;
+  vision_findings: VisionFinding[];
+  interview: KaizenAnswer[];
+  signals: string[];
   score_rationale: string | null;
+
   action_id: string | null;
+  duplicate_action_id: string | null;
+  promoted_from_id: string | null;
+  approval_route: string[];
+  approval_step: number;
+  approval_trail: Array<{
+    step: number;
+    role: string | null;
+    by: string;
+    accepted: boolean;
+    note: string | null;
+    at: string;
+  }>;
   decision_note: string | null;
+
+  verified_saving_paise: number;
+  verified_saving_display: string;
+  points_awarded: number;
   created_at: string;
 }
 
-export interface KaizenContributor {
+export interface KaizenClassification {
+  category: string;
+  category_label: string;
+  saving_type: string;
+  safety_flagged: boolean;
+  categories: Array<{ value: string; label: string }>;
+  questions: KaizenQuestion[];
+  context: KaizenContext;
+  /** Questions Core answered, and therefore never asked. */
+  skipped: string[];
+}
+
+export interface KaizenPreview {
+  category: string;
+  category_label: string;
+  saving_type: string;
+  context: KaizenContext;
+  history: KaizenHistory;
+  similar: KaizenIdea["similar"];
+  impact: KaizenImpact;
+  challenge: KaizenChallenge | null;
+  forecast: KaizenForecast | null;
+  priority_verdict: KaizenVerdict;
+  rationale: string;
+}
+
+export interface KaizenSubmission {
+  title: string;
+  description: string;
+  track?: KaizenTrack;
+  voice_transcript?: string | null;
+  voice_language?: string | null;
+  station_id?: string | null;
+  category?: string | null;
+  vision_findings?: VisionFinding[];
+  vision_ran?: boolean;
+  interview?: KaizenAnswer[];
+  investment_paise?: number;
+  needs_shutdown?: boolean;
+  proposed_fix?: string | null;
+  context_confirmed?: boolean;
+  unknown_station_note?: string | null;
+  credited_operator_id?: string | null;
+  submitted_by_name?: string | null;
+  attachment_ids?: string[];
+}
+
+/** The operator's home screen: level, points, and this month's counter. */
+export interface KaizenStanding {
   name: string;
-  ideas: number;
-  accepted: number;
-  estimated_annual_saving_paise: number;
-  estimated_annual_saving_display: string;
+  points: number;
+  level: string;
+  level_label: string;
+  next_level_label: string | null;
+  points_to_next: number;
+  level_floor: number;
+  level_ceiling: number | null;
+  this_month: number;
+  monthly_minimum: number;
+  days_left_in_month: number;
+  verified_saving_paise: number;
+  verified_saving_display: string;
+}
+
+export interface KaizenBoardRow {
+  name: string;
+  board: string;
+  points: number;
+  submissions: number;
+  verified_saving_paise: number;
+  verified_saving_display: string;
+  level: string;
+  operator_id: string | null;
+}
+
+export interface KaizenPattern {
+  id: string;
+  label: string;
+  kaizen_count: number;
+  event_count: number;
+  departments: string[];
+  verified_cost_paise: number;
+  verified_cost_display: string;
+  lost_minutes: number;
+  recommendation: string | null;
+  action_id: string | null;
+  detected_on: string;
+}
+
+export interface KaizenParticipation {
+  department: string;
+  headcount: number;
+  submitted: number;
+  percent: number;
+}
+
+export interface KaizenDashboard {
+  quick_wins: KaizenIdea[];
+  pending: KaizenIdea[];
+  delayed: KaizenIdea[];
+  top_savings: KaizenIdea[];
+  safety: KaizenIdea[];
+  patterns: KaizenPattern[];
+  participation: KaizenParticipation[];
+  leaderboards: Record<string, KaizenBoardRow[]>;
+  totals: {
+    by_status: Record<string, number>;
+    by_track: Record<string, number>;
+    total: number;
+    quick_share_percent: number;
+    approved_hard_paise: number;
+    approved_hard_display: string;
+    approved_soft_paise: number;
+    approved_soft_display: string;
+    verified_paise: number;
+    verified_display: string;
+  };
+}
+
+export interface KaizenSettings {
+  template: "simple" | "standard" | "open";
+  steps: string[];
+  auto_approve_below_paise: number;
+  auto_approve_min_score: number;
+  safety_always_to_owner: boolean;
+  finance_above_paise: number;
+  history_window_days: number;
+  score_weights: Record<string, number>;
+  pattern_min_items: number;
+  pattern_min_value_paise: number;
+  patterns_include_quick: boolean;
+  promote_above_paise: number;
+  monthly_minimum: number;
+  quick_win_investment_paise: number;
+  enabled_categories: string[];
+  /** Core's own Action threshold. Kaizen never introduces a second one. */
+  action_threshold_paise: number;
+  action_threshold_display: string;
 }
 
 export interface SkillMatrix {
@@ -1076,3 +1445,86 @@ export interface Attachment {
 }
 
 export interface OnboardingDefaults { reason_codes_added: number; defect_codes_added: number }
+
+
+// ---------------------------------------------------------------------------
+// The role desks (§1, "Who uses it") — Maintenance and Stores
+// ---------------------------------------------------------------------------
+//
+// §1 gives each of these roles two duties and a cadence of "when events occur".
+// Neither desk is a dashboard: one answers "what is mine, right now, and what
+// is it costing", and offers the single write §1 names for that role.
+
+export interface OpenStop {
+  event_id: string;
+  station_id: string;
+  station_code: string;
+  station_name: string;
+  reason_code: string | null;
+  reason_label: string | null;
+  /** §8.1 reserves this for MTBF/MTTR — 'Machine Breakdown' only. A badge, never a filter. */
+  is_breakdown: boolean;
+  started_at: string;
+  minutes: number;
+  cost_paise: number;
+  cost_display: string;
+  note: string | null;
+  repair_note?: string | null;
+  repair_part_changed?: string | null;
+  repaired_by_name?: string | null;
+  repaired_at?: string | null;
+  escalation_level: number;
+}
+
+export interface ClosedBreakdown {
+  event_id: string;
+  station_code: string;
+  station_name: string;
+  reason_label: string | null;
+  started_at: string;
+  ended_at: string | null;
+  minutes: number;
+  cost_paise: number;
+  cost_display: string;
+}
+
+export interface MaintenanceDesk {
+  alerts: Escalation[];
+  /** Open stops this plant's reason codes route to maintenance. */
+  open_breakdowns: OpenStop[];
+  other_open_stops: OpenStop[];
+  awaiting_repair_note: ClosedBreakdown[];
+  open_cost_paise: number;
+  open_cost_display: string;
+}
+
+export type StagingStatus = "pending" | "staged" | "short";
+
+export interface StagingRow {
+  job_order_id: string;
+  job_number: string;
+  part_number: string;
+  part_description: string | null;
+  customer_name: string | null;
+  planned_quantity: number;
+  station_codes: string[];
+  status: StagingStatus;
+  quantity_required: number | null;
+  quantity_staged: number | null;
+  note: string | null;
+  confirmed_by_name: string | null;
+  confirmed_at: string | null;
+  wait_events: number;
+  wait_cost_paise: number;
+  wait_cost_display: string;
+}
+
+export interface StoresDesk {
+  business_date: string;
+  alerts: Escalation[];
+  open_waits: OpenStop[];
+  queue: StagingRow[];
+  pending_count: number;
+  wait_cost_today_paise: number;
+  wait_cost_today_display: string;
+}

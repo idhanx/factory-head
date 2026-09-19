@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.core.db import dispose_engine, engine
 from app.ws.manager import manager
 from app.ws.routes import router as ws_router
+from app.ws.routes import stop_all_tickers
 
 logging.basicConfig(level=logging.INFO if not settings.debug else logging.DEBUG)
 structlog.configure(
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await stop_all_tickers()
         await manager.shutdown()
         await dispose_engine()
         log.info("api.shutdown")

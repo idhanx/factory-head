@@ -937,39 +937,372 @@ class AuditPackOut(BaseModel):
     created_at: datetime
 
 
+# --- Kaizen AI (Plugin Edition) ----------------------------------------------
+#
+# Money crosses this surface as integer paise plus a pre-formatted display
+# string, and the hard / soft split is never merged into one figure — that
+# separation is the credibility engine of the whole plugin (§7.2).
+
+
+class KaizenContextOut(BaseModel):
+    """§5.1 — what Core already knows, shown for one-tap confirmation."""
+
+    station_id: uuid.UUID | None = None
+    station_code: str | None = None
+    station_name: str | None = None
+    line: str | None = None
+    department: str | None = None
+    job_order_id: uuid.UUID | None = None
+    job_number: str | None = None
+    part_id: uuid.UUID | None = None
+    part_number: str | None = None
+    operation_id: uuid.UUID | None = None
+    operation_code: str | None = None
+    bottleneck_factor: float | None = None
+    is_bottleneck: bool | None = None
+    #: Question keys Core has answered, so Step 4 never asks them.
+    known: list[str] = Field(default_factory=list)
+    prompt: str = ""
+
+
+class KaizenTranscriptRequest(BaseModel):
+    """Step 1 — voice to text. Phase 1 transcribes on the device."""
+
+    text: str = Field(min_length=1, max_length=4000)
+    language: str | None = Field(default=None, max_length=8)
+
+
+class KaizenTranscriptOut(BaseModel):
+    text: str
+    original: str
+    #: False when the local model was unavailable and the words are unchanged.
+    cleaned: bool
+
+
+class KaizenVisionFinding(BaseModel):
+    """Step 2 — a suggestion shown ONLY to the operator until they accept it."""
+
+    category: Literal[
+        "housekeeping", "safety_hazard", "leak_or_spill", "missing_label", "obstruction"
+    ]
+    text: str = Field(max_length=280)
+    accepted: bool = False
+
+
+class KaizenVisionOut(BaseModel):
+    findings: list[KaizenVisionFinding] = Field(default_factory=list)
+    ran: bool
+    note: str | None = None
+    attachment_id: uuid.UUID | None = None
+
+
+class KaizenQuestion(BaseModel):
+    key: str
+    text: str
+    kind: Literal["choice", "number", "text", "boolean"]
+    options: list[str] = Field(default_factory=list)
+    values: list[float] = Field(default_factory=list)
+    unit: str | None = None
+    depends_on: list[str] | None = None
+    optional: bool = False
+
+
+class KaizenClassifyRequest(BaseModel):
+    title: str = Field(min_length=3, max_length=300)
+    description: str = Field(min_length=3, max_length=4000)
+    station_id: uuid.UUID | None = None
+    vision_findings: list[KaizenVisionFinding] = Field(default_factory=list)
+
+
+class KaizenClassifyOut(BaseModel):
+    """Steps 3 and 4 — the category to confirm, and the questions that follow."""
+
+    category: str
+    category_label: str
+    saving_type: str
+    safety_flagged: bool
+    #: Every category, so "Change" shows the operator a full list.
+    categories: list[dict[str, str]]
+    questions: list[KaizenQuestion]
+    context: KaizenContextOut
+    #: Questions Core answered, and therefore never asked.
+    skipped: list[str] = Field(default_factory=list)
+
+
+class KaizenAnswer(BaseModel):
+    key: str = Field(max_length=64)
+    question: str | None = Field(default=None, max_length=300)
+    answer: Any = None
+    unit: str | None = Field(default=None, max_length=16)
+    #: "operator" when tapped, "core" when inherited and never asked.
+    source: Literal["operator", "core"] = "operator"
+
+
 class KaizenSubmission(BaseModel):
+    """Everything the phone collected across Steps 1-4."""
+
     title: str = Field(min_length=3, max_length=300)
     description: str = Field(min_length=10, max_length=4000)
-    submitted_by_name: str | None = Field(default=None, max_length=200)
+    track: Literal["quick", "full"] = "full"
+    voice_transcript: str | None = Field(default=None, max_length=4000)
+    voice_language: str | None = Field(default=None, max_length=8)
     station_id: uuid.UUID | None = None
-    operator_id: uuid.UUID | None = None
+    category: str | None = None
+    vision_findings: list[KaizenVisionFinding] = Field(default_factory=list)
+    vision_ran: bool = False
+    interview: list[KaizenAnswer] = Field(default_factory=list)
+    investment_paise: int = Field(default=0, ge=0)
+    needs_shutdown: bool = False
+    proposed_fix: str | None = Field(default=None, max_length=1000)
+    context_confirmed: bool = False
+    unknown_station_note: str | None = Field(default=None, max_length=300)
+    #: Submit-on-behalf. Points and recognition go to this operator, never to
+    #: the person filling the form.
+    credited_operator_id: uuid.UUID | None = None
+    submitted_by_name: str | None = Field(default=None, max_length=200)
+    attachment_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class KaizenSavingOut(BaseModel):
+    """The two columns, never merged (§7.2)."""
+
+    hard_paise: int
+    hard_display: str
+    soft_paise: int
+    soft_display: str
+    basis: str | None = None
+    provisional: bool = False
+    provisional_note: str | None = None
+    #: §7.3 — the single question the approval card may ask, never blocking.
+    missing_rate_key: str | None = None
+    missing_rate_label: str | None = None
+
+
+class KaizenImpactOut(BaseModel):
+    """The Business Impact Card. Rupees and stars, never mixed."""
+
+    saving: KaizenSavingOut
+    stars: dict[str, int]
+    effort_score: int
+    impact_score: int
+    investment_paise: int
+    investment_display: str
+    investment_is_estimate: bool
+    payback_months: float | None = None
+    roi_percent: float | None = None
+    cost_of_doing_nothing: dict[str, Any]
 
 
 class KaizenIdeaOut(BaseModel):
     id: uuid.UUID
     reference: str
+    track: str
     title: str
     description: str
+    voice_transcript: str | None = None
+
     submitted_by_name: str
-    station_code: str | None
+    credited_name: str
+    credited_operator_id: uuid.UUID | None = None
+    board: str
+    department: str | None = None
+    submitted_on: date | None = None
+
+    station_code: str | None = None
+    line: str | None = None
+    part_number: str | None = None
+    reason_label: str | None = None
+    defect_label: str | None = None
+    unknown_station_note: str | None = None
+
+    category: str | None = None
+    category_label: str | None = None
+    saving_type: str | None = None
     status: str
-    estimated_annual_saving_paise: int
-    estimated_annual_saving_display: str
-    impact_score: int
-    effort_score: int
-    #: Shown to the operator. An idea that is declined without a readable reason
-    #: is how a suggestion scheme dies in month two.
-    score_rationale: str | None
-    action_id: uuid.UUID | None
-    decision_note: str | None
+    #: HIGH | MEDIUM | LOW. The 0-100 score is never shown as a headline (§11.2).
+    priority_verdict: str | None = None
+    safety_flagged: bool = False
+    is_recurrence: bool = False
+
+    impact: KaizenImpactOut
+    #: Step 5A, frozen at submission so an approver's evidence is reproducible.
+    history: dict[str, Any] | None = None
+    similar: list[dict[str, Any]] | None = None
+    challenge: dict[str, Any] | None = None
+    forecast: dict[str, Any] | None = None
+    vision_findings: list[KaizenVisionFinding] = Field(default_factory=list)
+    interview: list[dict[str, Any]] = Field(default_factory=list)
+    signals: list[str] = Field(default_factory=list)
+    score_rationale: str | None = None
+
+    action_id: uuid.UUID | None = None
+    duplicate_action_id: uuid.UUID | None = None
+    promoted_from_id: uuid.UUID | None = None
+    approval_route: list[str] = Field(default_factory=list)
+    approval_step: int = 0
+    approval_trail: list[dict[str, Any]] = Field(default_factory=list)
+    decision_note: str | None = None
+
+    verified_saving_paise: int = 0
+    verified_saving_display: str = "\u20b90"
+    points_awarded: int = 0
     created_at: datetime
+
+
+class KaizenPreviewRequest(KaizenSubmission):
+    """Steps 5A-9 without committing — what the operator sees before they submit."""
+
+
+class KaizenPreviewOut(BaseModel):
+    category: str
+    category_label: str
+    saving_type: str
+    context: KaizenContextOut
+    history: dict[str, Any]
+    similar: list[dict[str, Any]] = Field(default_factory=list)
+    impact: KaizenImpactOut
+    challenge: dict[str, Any] | None = None
+    forecast: dict[str, Any] | None = None
+    priority_verdict: str
+    rationale: str
 
 
 class KaizenDecision(BaseModel):
     accept: bool
+    note: str | None = Field(default=None, max_length=2000)
     owner_name: str | None = Field(default=None, max_length=200)
     due_date: date | None = None
-    note: str | None = Field(default=None, max_length=2000)
+    #: Replaces the operator's guess with the real figure from Maintenance or
+    #: Purchase; payback and ROI recalculate on the spot.
+    investment_paise: int | None = Field(default=None, ge=0)
+
+
+class KaizenChallengeChoice(BaseModel):
+    """Step 7 — which option went forward, and why an alternative was dismissed.
+
+    Every dismissal is logged so the suggestions improve: AI does not know the
+    plant layout and will sometimes propose something physically impossible.
+    """
+
+    chosen: Literal["mine", "alternative", "both"]
+    dismissed_reason: str | None = Field(default=None, max_length=500)
+
+
+class KaizenPromoteRequest(BaseModel):
+    """A Quick Observation that turned out to matter (§"AI auto-promotes")."""
+
+    interview: list[KaizenAnswer] = Field(default_factory=list)
+    investment_paise: int = Field(default=0, ge=0)
+    needs_shutdown: bool = False
+    proposed_fix: str | None = Field(default=None, max_length=1000)
+
+
+class KaizenRateRequest(BaseModel):
+    """§7.3 — the one place Kaizen writes a cost value, into CORE's cost master."""
+
+    key: Literal["electricity_kwh", "compressed_air_m3", "scrap_recovery_kg"]
+    paise: int = Field(gt=0)
+    effective_from: date | None = None
+
+
+class KaizenStandingOut(BaseModel):
+    """The operator's home screen: level, points, and this month's counter."""
+
+    name: str
+    points: int
+    level: str
+    level_label: str
+    next_level_label: str | None = None
+    points_to_next: int = 0
+    level_floor: int = 0
+    level_ceiling: int | None = None
+    this_month: int = 0
+    monthly_minimum: int = 1
+    days_left_in_month: int = 0
+    verified_saving_paise: int = 0
+    verified_saving_display: str
+
+
+class KaizenPatternOut(BaseModel):
+    id: uuid.UUID
+    label: str
+    kaizen_count: int
+    event_count: int
+    departments: list[str] = Field(default_factory=list)
+    #: Recorded, not estimated — only Core events contribute (§10.2).
+    verified_cost_paise: int
+    verified_cost_display: str
+    lost_minutes: int
+    recommendation: str | None = None
+    action_id: uuid.UUID | None = None
+    detected_on: date
+
+
+class KaizenProjectRequest(BaseModel):
+    owner_name: str | None = Field(default=None, max_length=200)
+    due_date: date | None = None
+    estimated_cost_paise: int = Field(default=0, ge=0)
+
+
+class KaizenSettingsOut(BaseModel):
+    template: str
+    steps: list[str] = Field(default_factory=list)
+    auto_approve_below_paise: int
+    auto_approve_min_score: int
+    safety_always_to_owner: bool
+    finance_above_paise: int
+    history_window_days: int
+    score_weights: dict[str, int]
+    pattern_min_items: int
+    pattern_min_value_paise: int
+    patterns_include_quick: bool
+    promote_above_paise: int
+    monthly_minimum: int
+    quick_win_investment_paise: int
+    enabled_categories: list[str] = Field(default_factory=list)
+    #: Core's own Action threshold. Kaizen never introduces a second one (§4.3).
+    action_threshold_paise: int
+    action_threshold_display: str
+
+
+class KaizenSettingsUpdate(BaseModel):
+    template: Literal["simple", "standard", "open"] | None = None
+    steps: list[str] | None = None
+    auto_approve_below_paise: int | None = Field(default=None, ge=0)
+    auto_approve_min_score: int | None = Field(default=None, ge=0, le=100)
+    safety_always_to_owner: bool | None = None
+    finance_above_paise: int | None = Field(default=None, ge=0)
+    history_window_days: int | None = Field(default=None, ge=30, le=730)
+    score_weights: dict[str, int] | None = None
+    pattern_min_items: int | None = Field(default=None, ge=2)
+    pattern_min_value_paise: int | None = Field(default=None, ge=0)
+    patterns_include_quick: bool | None = None
+    promote_above_paise: int | None = Field(default=None, ge=0)
+    #: "Do not raise the default above 1." One 30-second observation clears it.
+    monthly_minimum: int | None = Field(default=None, ge=0, le=10)
+    quick_win_investment_paise: int | None = Field(default=None, ge=0)
+    enabled_categories: list[str] | None = None
+
+
+class KaizenDigestOut(BaseModel):
+    """§12.1 — the block Kaizen contributes to Core's weekly owner digest."""
+
+    block: dict[str, Any]
+    rendered: str
+
+
+class KaizenDashboardOut(BaseModel):
+    """§12.2, in build order: Quick Wins first, the rest later."""
+
+    quick_wins: list[KaizenIdeaOut]
+    pending: list[KaizenIdeaOut]
+    delayed: list[KaizenIdeaOut]
+    top_savings: list[KaizenIdeaOut]
+    safety: list[KaizenIdeaOut]
+    patterns: list[KaizenPatternOut]
+    participation: list[dict[str, Any]]
+    leaderboards: dict[str, list[dict[str, Any]]]
+    totals: dict[str, Any]
 
 
 class SkillUpdate(BaseModel):

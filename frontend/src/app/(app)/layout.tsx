@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity, BarChart3, BookOpen, Boxes, ClipboardCheck, ClipboardList, GraduationCap, History, LayoutGrid,
-  Lightbulb, LogOut, Menu, MessageSquare, Presentation, Search, Settings2,
-  ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp,
+  Lightbulb, LogOut, Menu, MessageSquare, PackageCheck, Presentation, Search, Settings2,
+  ShieldCheck, SlidersHorizontal, Sparkles, TrendingUp, Wrench,
 } from "lucide-react";
 import { clearSession, loadSession } from "@/lib/api";
 import { NAV, can, canReach, homeFor } from "@/lib/roles";
@@ -15,12 +15,16 @@ import { SyncPill, useSyncAgent } from "@/components/sync-status";
 import { PushToggle } from "@/components/push-toggle";
 import type { Session } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
+import { activeLocale } from "@/lib/format";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "/floor": LayoutGrid,
   "/shift": Activity,
   "/shifts": History,
   "/quality": ClipboardCheck,
+  "/maintenance": Wrench,
+  "/stores": PackageCheck,
   "/meeting": Presentation,
   "/actions": ClipboardList,
   "/memory": BookOpen,
@@ -60,6 +64,7 @@ function initials(name: string): string {
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const router = useRouter();
   const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
@@ -110,7 +115,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="led"
             style={{ background: "var(--color-brand)", color: "var(--color-brand)" }}
           />
-          <span className="text-2 text-sm">Loading…</span>
+          <span className="text-2 text-sm">{t("Loading…")}</span>
         </div>
       </div>
     );
@@ -127,7 +132,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </span>
         <span className="min-w-0">
           <span className="display block text-[0.9375rem] font-bold leading-none">
-            FactoryManager
+            {t("FactoryManager")}
           </span>
           <span className="text-rail-2 mt-1 block truncate text-[0.6875rem] leading-none">
             {session.plant_name}
@@ -136,14 +141,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Link>
 
       {/* ---- Navigation -------------------------------------------------- */}
-      <nav className="mt-5 flex-1 space-y-4 overflow-y-auto [@media(max-height:920px)]:mt-3 [@media(min-height:801px)_and_(max-height:920px)]:space-y-2.5 [@media(max-height:800px)]:space-y-1.5" aria-label="Main">
+      <nav className="mt-5 flex-1 space-y-4 overflow-y-auto [@media(max-height:920px)]:mt-3 [@media(min-height:801px)_and_(max-height:920px)]:space-y-2.5 [@media(max-height:800px)]:space-y-1.5" aria-label={t("Main")}>
         {GROUPS.map((group) => {
           const groupItems = items.filter((item) => item.group === group.key);
           if (!groupItems.length) return null;
           return (
             <div key={group.key}>
               <p className="text-rail-2 px-3 pb-1.5 text-[0.625rem] font-semibold tracking-[0.1em] uppercase [@media(max-height:800px)]:pb-0.5">
-                {group.label}
+                {t(group.label)}
               </p>
               <ul className="space-y-0.5">
                 {groupItems.map((item) => {
@@ -163,7 +168,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         )}
                       >
                         <Icon className="size-[1.0625rem] shrink-0" />
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{t(item.label)}</span>
                       </Link>
                     </li>
                   );
@@ -186,12 +191,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           and as a tooltip, so the rule is compacted, never dropped. */}
       <div
         className="brand mt-4 shrink-0 rounded-2xl p-4 [@media(max-height:920px)]:mt-3 [@media(max-height:920px)]:flex [@media(max-height:920px)]:items-center [@media(max-height:920px)]:gap-2.5 [@media(max-height:920px)]:px-3.5 [@media(max-height:920px)]:py-2.5"
-        title="This data targets machines, reasons and processes — never individuals."
+        title={t("This data targets machines, reasons and processes — never individuals.")}
       >
         <ShieldCheck className="size-5 shrink-0 [@media(max-height:920px)]:size-4" />
-        <p className="mt-2.5 text-[0.8125rem] font-bold [@media(max-height:920px)]:mt-0">No blame</p>
+        <p className="mt-2.5 text-[0.8125rem] font-bold [@media(max-height:920px)]:mt-0">{t("No blame")}</p>
         <p className="mt-1 text-[0.75rem] leading-snug opacity-70 [@media(max-height:920px)]:sr-only">
-          This data targets machines, reasons and processes — never individuals.
+          {t("This data targets machines, reasons and processes — never individuals.")}
         </p>
       </div>
     </div>
@@ -208,7 +213,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
             type="button"
-            aria-label="Close navigation"
+            aria-label={t("Close navigation")}
             onClick={() => setNavOpen(false)}
             className="absolute inset-0 bg-[oklch(20%_0.01_70/0.45)] backdrop-blur-sm"
           />
@@ -222,7 +227,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setNavOpen(true)}
-            aria-label="Open navigation"
+            aria-label={t("Open navigation")}
             className="text-2 grid size-10 shrink-0 place-items-center rounded-xl border transition-colors hover:surface-2 hover:text-[var(--text)] lg:hidden"
           >
             <Menu className="size-5" />
@@ -235,14 +240,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="text-3 surface-2 flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full px-4 text-sm transition-colors hover:surface-3 sm:max-w-sm"
           >
             <Search className="size-4 shrink-0" />
-            <span className="truncate">Ask about the plant…</span>
+            <span className="truncate">{t("Ask about the plant…")}</span>
           </Link>
 
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <SyncPill />
             <PushToggle />
             <span className="text-2 surface-2 hidden rounded-full px-3.5 py-2 text-[0.8125rem] font-medium xl:block">
-              {new Date().toLocaleDateString("en-IN", {
+              {new Date().toLocaleDateString(activeLocale(), {
                 day: "numeric",
                 month: "short",
                 year: "numeric",
@@ -278,7 +283,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 clearSession();
                 router.replace("/login");
               }}
-              aria-label="Sign out"
+              aria-label={t("Sign out")}
               className="text-3 grid size-11 shrink-0 place-items-center rounded-xl border transition-colors hover:surface-2 hover:text-[var(--text)]"
             >
               <LogOut className="size-4" />
@@ -286,7 +291,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-5 sm:py-7">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-7 sm:px-6 sm:py-9 lg:px-8 lg:py-10">
+          {children}
+        </main>
       </div>
     </div>
   );

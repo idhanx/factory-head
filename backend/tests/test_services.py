@@ -605,3 +605,109 @@ async def test_an_event_with_no_job_running_costs_only_time(session, fixtures):
     assert event.cost_breakdown["lost_contribution"] == 0
     assert event.cost_breakdown["parts_not_made"] == 0
     assert event.cost_total == rupees("634.50")  # time terms only
+
+
+async def test_the_weeks_since_closure_are_read_in_one_query_not_one_per_week(
+    session, fixtures
+):
+    """A fix verified long ago must not cost a query per week, for ever.
+
+    The accrual runs hourly over every Action still in CHECK or ACT, and those
+    in ACT never leave the set. Walking a query per elapsed week meant the work
+    grew for as long as the plant kept using the product — while the answer it
+    produced only changes when a week rolls over or a past shift is corrected.
+
+    This pins both halves: the week series is what the per-week walk produced
+    (one entry per complete week, a loss landing in the week it happened), and
+    reading it takes a fixed number of queries however old the Action is.
+    """
+    plant = fixtures["plant"]
+    closed_at = NOW - timedelta(weeks=8)
+    action = await _closed_action(session, fixtures, closed_at=closed_at)
+
+    # One stop, in the fourth complete week after closure.
+    await _stop(session, fixtures, closed_at + timedelta(weeks=3, days=2), 90)
+
+    as_of = closed_at.date() + timedelta(weeks=8)
+    weeks = await action_service._weeks_after_closure(
+        session, plant=plant, action=action, as_of=as_of
+    )
+
+    # Complete weeks only, measured from the day the fix landed.
+    assert [w.week_start for w in weeks] == [
+        closed_at.date() + timedelta(weeks=i) for i in range(8)
+    ]
+    charged = [w for w in weeks if w.loss > 0]
+    assert len(charged) == 1, f"expected one week to carry the stop, got {charged}"
+    assert charged[0].week_start == closed_at.date() + timedelta(weeks=3)
+
+    # A week still in progress is not a result, so a part-week adds nothing.
+    assert (
+        await action_service._weeks_after_closure(
+            session, plant=plant, action=action, as_of=as_of + timedelta(days=6)
+        )
+        == weeks
+    )
+
+    # However far back the closure is, the losses are read in one grouped query.
+    from sqlalchemy import event as sa_event
+
+    statements = 0
+
+    def count(*_args, **_kwargs):
+        nonlocal statements
+        statements += 1
+
+    bind = session.get_bind()
+    sa_event.listen(bind, "before_cursor_execute", count)
+    try:
+        await action_service._weeks_after_closure(
+            session, plant=plant, action=action, as_of=closed_at.date() + timedelta(weeks=52)
+        )
+    finally:
+        sa_event.remove(bind, "before_cursor_execute", count)
+
+    assert statements == 1, f"expected one grouped query, issued {statements}"
+
+
+async def test_a_question_the_copilot_did_not_understand_is_not_answered_as_if_it_had(
+    session, fixtures
+):
+    """§3 Layer 3 — "a wrong guess should produce a narrower answer, not a wrong one".
+
+    Anything matching no keyword falls through to today's position. That is a
+    reasonable default, but presented bare it reads as the answer: asking for
+    the ROI and being told this morning's downtime, full stop, is the
+    confidently-irrelevant reply the whole layer is built to avoid. The numbers
+    still go out; what has to be there is the sentence saying they are not what
+    was asked for.
+    """
+    from app.ai.copilot import _deterministic_answer
+    from app.ai.facts import build_question_facts
+
+    plant = fixtures["plant"]
+    as_of = NOW.date()
+
+    bundle, intent = await build_question_facts(
+        session, plant=plant, question="What is our return on investment?", as_of=as_of
+    )
+    assert intent == "unrecognised"
+    assert "not understood" in _deterministic_answer(bundle)
+
+    # A question that really is about now keeps its plain answer.
+    bundle, intent = await build_question_facts(
+        session, plant=plant, question="How are we doing today?", as_of=as_of
+    )
+    assert intent == "today"
+    assert "not understood" not in _deterministic_answer(bundle)
+
+    # And the branches that did match are untouched.
+    for question, expected in (
+        ("How much did we lose this week?", "period_loss"),
+        ("Which defect is increasing?", "quality"),
+        ("Have we seen this before?", "memory"),
+    ):
+        _, intent = await build_question_facts(
+            session, plant=plant, question=question, as_of=as_of
+        )
+        assert intent == expected, question

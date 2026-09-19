@@ -78,6 +78,13 @@ class Plant(Base, TimestampMixin):
     # §10 — announced out loud by the owner at kickoff, enforced in the product.
     no_blame_until: Mapped[date | None] = mapped_column(Date)
 
+    # Every annualised figure in the product divides or multiplies by this:
+    # projected losses, Kaizen savings, capacity released. 300 is the Indian
+    # auto-ancillary norm (six days a week, less public holidays and shutdown).
+    working_days_per_year: Mapped[int] = mapped_column(
+        Integer, default=300, server_default="300"
+    )
+
     go_live_date: Mapped[date | None] = mapped_column(Date)
     #: §5.2 — the deadline an auto-created Action gets, in days from the shift.
     action_due_days: Mapped[int] = mapped_column(Integer, default=3, server_default="3")

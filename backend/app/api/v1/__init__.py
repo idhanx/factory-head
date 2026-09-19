@@ -13,6 +13,7 @@ from . import (
     delivery,
     escalations,
     ingest,
+    kaizen,
     maintenance,
     masters,
     onboarding,
@@ -43,6 +44,8 @@ api_router.include_router(reports.router)
 api_router.include_router(ai.router)
 api_router.include_router(onboarding.router)
 api_router.include_router(plugins.router)
+# Kaizen shares the /plugins prefix but has outgrown the shared router.
+api_router.include_router(kaizen.router)
 api_router.include_router(trace.router)
 api_router.include_router(ingest.router)
 api_router.include_router(admin.router)

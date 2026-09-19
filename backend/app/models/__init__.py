@@ -31,6 +31,23 @@ from .events import (
     StageCompletion,
     StagingStatus,
 )
+from .kaizen import (
+    CATEGORY_LABELS,
+    CATEGORY_LABELS_BY_VALUE,
+    LIVE_STATUSES,
+    OPEN_STATUSES,
+    TEMPLATE_STEPS,
+    ApprovalTemplate,
+    KaizenCategory,
+    KaizenCategoryCode,
+    KaizenIdea,
+    KaizenPattern,
+    KaizenPoint,
+    KaizenSettings,
+    KaizenStatus,
+    KaizenTrack,
+    VisionCategory,
+)
 from .masters import (
     AlertRecipient,
     CostFamily,
@@ -64,8 +81,6 @@ from .plugins import (
     AuditPack,
     ClauseStatus,
     ComplianceClause,
-    KaizenIdea,
-    KaizenStatus,
     OperatorSkill,
     SkillLevel,
     Standard,

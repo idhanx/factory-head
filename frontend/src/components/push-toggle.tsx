@@ -7,6 +7,7 @@ import { disablePush, enablePush, pushState, type PushState } from "@/lib/offlin
 import { Button } from "@/components/ui/button";
 import { ErrorNote } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
+import { useT } from "@/lib/i18n";
 
 /**
  * Alerts on this device. A bell in the header for everyone signed in.
@@ -46,6 +47,7 @@ const COPY: Record<PushState, { title: string; hint: string }> = {
 };
 
 export function PushToggle() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<PushState>("checking");
   const [busy, setBusy] = useState(false);
@@ -57,7 +59,7 @@ export function PushToggle() {
       .then(setState)
       .catch((e: Error) => {
         setState("off");
-        setError(`Could not check alerts: ${e.message}`);
+        setError(t("Could not check alerts: {0}", { 0: e.message }));
       });
   }, []);
 
@@ -86,7 +88,7 @@ export function PushToggle() {
           check();
         }}
         aria-haspopup="dialog"
-        aria-label={`Alerts on this device: ${COPY[state].title}`}
+        aria-label={t("Alerts on this device: {0}", { 0: t(COPY[state].title) })}
         className={cn(
           "grid size-11 shrink-0 place-items-center rounded-xl border transition-colors hover:surface-2 hover:text-[var(--text)]",
           state === "on" ? "text-[var(--color-accent)]" : "text-3",
@@ -96,25 +98,27 @@ export function PushToggle() {
       </button>
 
       {open ? (
-        <Sheet title="Alerts on this device" subtitle={COPY[state].title} onClose={() => setOpen(false)}>
+        <Sheet title={t("Alerts on this device")} subtitle={t(COPY[state].title)} onClose={() => setOpen(false)}>
           <div className="space-y-4">
-            {COPY[state].hint ? <p className="text-2 text-sm leading-relaxed">{COPY[state].hint}</p> : null}
+            {COPY[state].hint ? (
+              <p className="text-2 text-sm leading-relaxed">{t(COPY[state].hint)}</p>
+            ) : null}
             {error ? <ErrorNote message={error} /> : null}
             <div className="flex flex-wrap gap-2">
               {state === "off" ? (
                 <Button size="touch" disabled={busy} onClick={() => void change(true)}>
                   <BellRing className="size-4" />
-                  {busy ? "Turning on…" : "Turn on alerts"}
+                  {busy ? t("Turning on…") : t("Turn on alerts")}
                 </Button>
               ) : null}
               {state === "on" ? (
                 <Button size="touch" variant="outline" disabled={busy} onClick={() => void change(false)}>
                   <BellOff className="size-4" />
-                  {busy ? "Turning off…" : "Turn off alerts"}
+                  {busy ? t("Turning off…") : t("Turn off alerts")}
                 </Button>
               ) : null}
               <Button size="touch" variant="ghost" onClick={() => setOpen(false)}>
-                Close
+                {t("Close")}
               </Button>
             </div>
           </div>

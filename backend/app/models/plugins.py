@@ -127,74 +127,9 @@ class AuditPack(Base, PlantScopedMixin, TimestampMixin):
     )
 
 
-# ===========================================================================
-# Kaizen AI
-# ===========================================================================
-
-
-class KaizenStatus(str, Enum):
-    SUBMITTED = "submitted"
-    SCORED = "scored"
-    ACCEPTED = "accepted"  # promoted to an Action
-    REJECTED = "rejected"
-    IMPLEMENTED = "implemented"
-
-
-class KaizenIdea(Base, PlantScopedMixin, TimestampMixin):
-    """An operator's improvement idea, converted into a costed proposal.
-
-    §3 Layer 5: *"Operators submit improvement ideas (eventually by voice, in
-    Tamil); the system converts each into a structured cost-saving proposal,
-    scores it, routes it into the Actions engine for implementation, and tracks
-    the realised saving through the same Recovered-Profit accounting the core
-    product already uses."*
-
-    The scoring is deliberately transparent — an operator whose idea is declined
-    can see why, and one whose idea is accepted can later see what it saved with
-    their name on it. That is most of what makes a suggestion scheme survive
-    past month two.
-
-    Voice capture in Tamil is explicitly deferred (§9 NOT-building list) until
-    the typed flows are proven.
-    """
-
-    __tablename__ = "kaizen_ideas"
-    __table_args__ = (Index("ix_kaizen_status", "plant_id", "status"),)
-
-    id: Mapped[uuid.UUID] = uuid_pk()
-    reference: Mapped[str] = mapped_column(String(32), nullable=False)  # "KZN-0042"
-    title: Mapped[str] = mapped_column(String(300), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-
-    submitted_by_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    submitted_by_operator_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("operators.id", ondelete="SET NULL")
-    )
-    station_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("stations.id", ondelete="SET NULL"), index=True
-    )
-    reason_code_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("reason_codes.id", ondelete="SET NULL")
-    )
-
-    status: Mapped[KaizenStatus] = mapped_column(
-        EnumString(KaizenStatus, 20), default=KaizenStatus.SUBMITTED, nullable=False
-    )
-
-    # Scored against the plant's own loss history, never against a generic
-    # rubric: an idea is worth what the losses it addresses actually cost here.
-    estimated_annual_saving: Mapped[int] = mapped_column(default=0)  # paise
-    effort_score: Mapped[int] = mapped_column(Integer, default=0)  # 1-5
-    impact_score: Mapped[int] = mapped_column(Integer, default=0)  # 1-5
-    score_rationale: Mapped[str | None] = mapped_column(Text)
-    linked_loss_paise: Mapped[int] = mapped_column(default=0)
-
-    # Promotion into the core Actions engine — never a parallel workflow.
-    action_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("actions.id", ondelete="SET NULL"), index=True
-    )
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    decision_note: Mapped[str | None] = mapped_column(Text)
+# Kaizen AI has outgrown this module: the plugin edition carries the whole
+# operator journey, its own configuration and a points ledger. It lives in
+# ``app.models.kaizen`` and is re-exported from ``app.models``.
 
 
 # ===========================================================================

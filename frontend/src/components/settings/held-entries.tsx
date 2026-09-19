@@ -12,6 +12,7 @@ import { ErrorNote } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import type { HoldStatus, SyncHold, SyncOpKind } from "@/types/api";
 import { DataTable, ListState, Notice, RowButton, Toolbar } from "./shared";
+import { useT } from "@/lib/i18n";
 
 /**
  * Entries that reached the server after their shift was locked.
@@ -41,6 +42,7 @@ function when(iso: string | null) {
 }
 
 export function HeldEntriesTab() {
+  const t = useT();
   const [status, setStatus] = useState<HoldStatus>("held");
   const [deciding, setDeciding] = useState<{ hold: SyncHold; verb: "apply" | "discard" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -77,10 +79,10 @@ export function HeldEntriesTab() {
   return (
     <div>
       <Toolbar
-        title="Held entries"
-        hint="Stops, counts and quality batches that reached the server after their shift was locked — usually a tablet that was offline at closing time. Apply one to write it into that shift as a logged correction, or discard it."
+        title={t("Held entries")}
+        hint={t("Stops, counts and quality batches that reached the server after their shift was locked — usually a tablet that was offline at closing time. Apply one to write it into that shift as a logged correction, or discard it.")}
       >
-        <div className="surface-2 flex gap-0.5 rounded-xl border p-1" role="group" aria-label="Show entries">
+        <div className="surface-2 flex gap-0.5 rounded-xl border p-1" role="group" aria-label={t("Show entries")}>
           {STATUSES.map((s) => (
             <button
               key={s.key}
@@ -103,18 +105,18 @@ export function HeldEntriesTab() {
         loading={holds.isLoading}
         error={holds.error}
         empty={rows.length === 0}
-        emptyTitle={status === "held" ? "Nothing waiting for review" : `No ${status} entries`}
+        emptyTitle={status === "held" ? "Nothing waiting for review" : t("No {0} entries", { 0: status })}
         emptyHint={
           status === "held"
-            ? "Every entry reached the server before its shift was locked."
-            : "Entries you apply or discard are listed here with the note given."
+            ? t("Every entry reached the server before its shift was locked.")
+            : t("Entries you apply or discard are listed here with the note given.")
         }
         onRetry={() => void holds.refetch()}
       >
         <DataTable
           rows={rows}
           columns={[
-            { header: "Kind", cell: (h) => <span className="font-semibold">{KIND_LABEL[h.kind] ?? h.kind}</span> },
+            { header: "Kind", cell: (h) => <span className="font-semibold">{t(KIND_LABEL[h.kind] ?? h.kind)}</span> },
             { header: "Station", cell: (h) => h.station_code ?? <span className="text-3">—</span> },
             {
               header: "Shift date",
@@ -126,7 +128,7 @@ export function HeldEntriesTab() {
               cell: (h) => (
                 <span>
                   {h.submitted_by_name ?? "—"}
-                  <span className="text-3 block text-xs">received {when(h.received_at)}</span>
+                  <span className="text-3 block text-xs">{t("received {0}", { 0: when(h.received_at) })}</span>
                 </span>
               ),
             },
@@ -149,7 +151,7 @@ export function HeldEntriesTab() {
                     cell: (h: SyncHold) => (
                       <span>
                         <Badge variant={h.status === "applied" ? "recovered" : "neutral"}>
-                          {h.status === "applied" ? "Applied" : "Discarded"}
+                          {h.status === "applied" ? t("Applied") : t("Discarded")}
                         </Badge>
                         {h.resolution_note ? <span className="mt-1 block">{h.resolution_note}</span> : null}
                         <span className="text-3 block text-xs">
@@ -164,15 +166,15 @@ export function HeldEntriesTab() {
             status === "held"
               ? (h) => (
                   <>
-                    <RowButton onClick={() => setDeciding({ hold: h, verb: "apply" })} aria-label={`Apply held ${KIND_LABEL[h.kind]}`}>
-                      Apply
+                    <RowButton onClick={() => setDeciding({ hold: h, verb: "apply" })} aria-label={t("Apply held {0}", { 0: t(KIND_LABEL[h.kind]) })}>
+                      {t("Apply")}
                     </RowButton>
                     <RowButton
                       onClick={() => setDeciding({ hold: h, verb: "discard" })}
                       className="text-[var(--color-loss)]"
-                      aria-label={`Discard held ${KIND_LABEL[h.kind]}`}
+                      aria-label={t("Discard held {0}", { 0: KIND_LABEL[h.kind] })}
                     >
-                      Discard
+                      {t("Discard")}
                     </RowButton>
                   </>
                 )
@@ -210,6 +212,7 @@ function DecideSheet({
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [note, setNote] = useState("");
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -223,14 +226,18 @@ function DecideSheet({
         void queryClient.invalidateQueries({ queryKey: ["shift-entries"] });
         void queryClient.invalidateQueries({ queryKey: ["kpis"] });
       }
-      onDone(`${KIND_LABEL[hold.kind]} ${verb === "apply" ? "applied to its shift" : "discarded"}.`);
+      onDone(
+        verb === "apply"
+          ? t("{0} applied to its shift.", { 0: t(KIND_LABEL[hold.kind]) })
+          : t("{0} discarded.", { 0: t(KIND_LABEL[hold.kind]) }),
+      );
     },
   });
 
   return (
     <Sheet
-      title={verb === "apply" ? "Apply to the locked shift" : "Discard this entry"}
-      subtitle={`${KIND_LABEL[hold.kind]}${hold.station_code ? ` · ${hold.station_code}` : ""} · ${summary}`}
+      title={verb === "apply" ? t("Apply to the locked shift") : t("Discard this entry")}
+      subtitle={`${t(KIND_LABEL[hold.kind])}${hold.station_code ? ` · ${hold.station_code}` : ""} · ${summary}`}
       onClose={onClose}
     >
       <form
@@ -238,18 +245,18 @@ function DecideSheet({
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (note.trim().length < 3) return setInvalid("Write a short note (at least 3 characters) saying why.");
+          if (note.trim().length < 3) return setInvalid(t("Write a short note (at least 3 characters) saying why."));
           setInvalid(null);
           decide.mutate();
         }}
       >
         <p className="text-2 text-sm leading-relaxed">
           {verb === "apply"
-            ? `It is written into the ${hold.business_date ?? "locked"} shift as a correction, costed with that shift's rates, and recorded in the audit log with your note.`
-            : "It is dropped and never counted. The entry and your note stay on record here."}
+            ? t("It is written into the {0} shift as a correction, costed with that shift's rates, and recorded in the audit log with your note.", { 0: hold.business_date ?? "locked" })
+            : t("It is dropped and never counted. The entry and your note stay on record here.")}
         </p>
         <div>
-          <Label htmlFor="hold-note">Note</Label>
+          <Label htmlFor="hold-note">{t("Note")}</Label>
           <Textarea
             id="hold-note"
             rows={3}
@@ -259,8 +266,8 @@ function DecideSheet({
             aria-invalid={Boolean(invalid)}
             placeholder={
               verb === "apply"
-                ? "Tablet in bay 2 lost Wi-Fi before close; stop confirmed with the supervisor"
-                : "Duplicate of the stop entered on the office PC"
+                ? t("Tablet in bay 2 lost Wi-Fi before close; stop confirmed with the supervisor")
+                : t("Duplicate of the stop entered on the office PC")
             }
           />
         </div>
@@ -268,10 +275,10 @@ function DecideSheet({
         {decide.error ? <ErrorNote message={decide.error.message} /> : null}
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="touch" variant={verb === "discard" ? "stop" : "primary"} disabled={decide.isPending}>
-            {decide.isPending ? "Saving…" : verb === "apply" ? "Apply entry" : "Discard entry"}
+            {decide.isPending ? t("Saving…") : verb === "apply" ? t("Apply entry") : t("Discard entry")}
           </Button>
           <Button type="button" size="touch" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </form>

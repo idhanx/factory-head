@@ -14,11 +14,9 @@ from sqlalchemy import select
 
 from app.kernel import downtime_event_cost, rupees
 from app.models import (
-    ActionTrigger,
     ClauseStatus,
     ComplianceClause,
     EscalationRoute,
-    KaizenStatus,
     OeeTreatment,
     Operator,
     ReasonCode,
@@ -29,7 +27,6 @@ from app.models import (
 from app.services import compliance as compliance_service
 from app.services import costing as costing_service
 from app.services import downtime as downtime_service
-from app.services import kaizen as kaizen_service
 from app.services import shifts as shift_service
 from app.services import skills as skills_service
 from tests.conftest import run_job
@@ -77,110 +74,10 @@ async def no_operator_reason(session, fixtures) -> ReasonCode:
     return reason
 
 
-# ===========================================================================
-# Kaizen AI
-# ===========================================================================
-
-
-def test_a_place_is_not_a_problem():
-    """Regression: 'put a fan near the inspection bench' once matched Quality
-    Hold on the word "inspection", was priced against every quality stop in the
-    plant, and came out as the most valuable idea of the lot."""
-    assert (
-        kaizen_service.match_reason(
-            "Put a fan near the inspection bench",
-            "The QC bench gets very hot and it is hard to concentrate on inspection.",
-        )
-        is None
-    )
-
-
-def test_keywords_match_whole_words_not_fragments():
-    """Regression: as substrings, 'oil' matched 'soil' and 'tool' matched 'stool'."""
-    assert kaizen_service.match_reason("Sweep the soil", "the stool in the kitchen") is None
-    assert (
-        kaizen_service.match_reason("Coolant oils", "") is not None
-    )  # prefix still matches
-
-
-def test_the_title_outranks_an_incidental_word_in_the_description():
-    assert (
-        kaizen_service.match_reason(
-            "Stage the material trolley early",
-            "so the tool setter is not waiting either",
-        )
-        == "MATERIAL_WAIT"
-    )
-
-
-async def test_an_idea_is_priced_against_this_plants_own_losses(session, fixtures):
-    await stop(session, fixtures, fixtures["reasons"]["TOOL_BREAKAGE"], minutes=47)
-
-    score = await kaizen_service.score_idea(
-        session,
-        plant=fixtures["plant"],
-        title="Change the insert at a fixed count",
-        description="Stop the tool breaking mid-shift.",
-        station_id=fixtures["station"].id,
-    )
-
-    assert score.reason_code == "TOOL_BREAKAGE"
-    assert score.linked_loss > 0
-    annualised = int(score.linked_loss * (365 / 90))
-    # A quarter of the annualised loss — ideas reduce a loss, rarely remove it.
-    assert score.annual_saving == int(annualised * kaizen_service.SCOPED_SHARE)
-
-
-async def test_an_idea_that_names_no_machine_is_credited_more_cautiously(session, fixtures):
-    await stop(session, fixtures, fixtures["reasons"]["TOOL_BREAKAGE"], minutes=47)
-
-    kwargs = {
-        "plant": fixtures["plant"],
-        "title": "Change the insert at a fixed count",
-        "description": "Stop the tool breaking mid-shift.",
-    }
-    scoped = await kaizen_service.score_idea(
-        session, station_id=fixtures["station"].id, **kwargs
-    )
-    unscoped = await kaizen_service.score_idea(session, **kwargs)
-
-    assert unscoped.annual_saving < scoped.annual_saving
-    assert "names no machine" in unscoped.rationale
-
-
-async def test_an_unpriced_idea_says_so_rather_than_inventing_a_saving(session, fixtures):
-    score = await kaizen_service.score_idea(
-        session,
-        plant=fixtures["plant"],
-        title="Paint the walkway lines again",
-        description="People keep walking into the forklift lane.",
-    )
-    assert score.reason_code is None
-    assert score.annual_saving == 0
-    assert score.impact == 1
-    assert "on its merits" in score.rationale
-
-
-async def test_accepting_an_idea_creates_a_real_action_with_a_frozen_baseline(
-    session, fixtures
-):
-    """§3 Layer 5: one Actions engine — never a parallel Kaizen workflow."""
-    await stop(session, fixtures, fixtures["reasons"]["TOOL_BREAKAGE"], minutes=47)
-    idea = await kaizen_service.submit(
-        session,
-        plant=fixtures["plant"],
-        title="Change the insert at a fixed count",
-        description="Stop the tool breaking mid-shift.",
-        submitted_by_name="Kumar M.",
-        station_id=fixtures["station"].id,
-    )
-
-    action = await kaizen_service.accept(session, plant=fixtures["plant"], idea=idea)
-
-    assert action.trigger is ActionTrigger.KAIZEN
-    assert action.baseline_frozen_at is not None
-    assert idea.status is KaizenStatus.ACCEPTED
-    assert idea.action_id == action.id
+# Kaizen AI is covered by ``tests/test_kaizen.py``: the plugin edition's
+# journey, cost engine, History Check, approval workflow and points ledger
+# need a file of their own, and the regressions these tests pinned moved
+# there with them.
 
 
 # ===========================================================================
@@ -416,24 +313,3 @@ async def test_a_gap_clause_never_shows_evidence_it_did_not_count(session, fixtu
         )
         if clause.status is ClauseStatus.GAP:
             assert evidence == [], f"{clause.clause_ref} is a gap but lists evidence"
-
-
-async def test_an_idea_naming_a_station_in_its_text_is_scoped_to_it(session, fixtures):
-    """An operator who writes 'CNC-3' has named the machine, dropdown or not."""
-    await stop(session, fixtures, fixtures["reasons"]["TOOL_BREAKAGE"], minutes=47)
-
-    named = await kaizen_service.score_idea(
-        session,
-        plant=fixtures["plant"],
-        title="Keep spare inserts at CNC-3",
-        description="Walking to stores for a new tool insert stretches every breakage.",
-    )
-    picked = await kaizen_service.score_idea(
-        session,
-        plant=fixtures["plant"],
-        title="Keep spare inserts at the machine",
-        description="Walking to stores for a new tool insert stretches every breakage.",
-        station_id=fixtures["station"].id,
-    )
-    assert named.annual_saving == picked.annual_saving
-    assert "CNC-3" in named.rationale

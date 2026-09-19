@@ -474,25 +474,86 @@ async def compute_baseline(
 async def _weeks_after_closure(
     session: AsyncSession, *, plant: Plant, action: Action, as_of: date
 ) -> list[WeeklyLoss]:
-    """Complete weeks since the Action closed. A week still in progress is not a result."""
+    """Complete weeks since the Action closed. A week still in progress is not a result.
+
+    One grouped query, not one per week. This is called twice an hour for every
+    Action still in CHECK or ACT, and a fix verified last year has fifty-two
+    weeks behind it — a query per week would grow without bound for as long as
+    the plant kept using the product, for an answer that only changes when a
+    week rolls over or someone corrects a past shift.
+    """
     closed_on = local_date(plant, action.closed_at)
-    weeks: list[WeeklyLoss] = []
-    week_start = closed_on
-    while week_start + timedelta(days=7) <= as_of:
-        week_end = week_start + timedelta(days=7)
-        loss = await weekly_loss(
-            session,
-            plant_id=plant.id,
-            station_id=action.station_id,
-            reason_code_id=action.reason_code_id,
-            start=week_start,
-            end=week_end,
-            loss_source=action.loss_source or LOSS_DOWNTIME,
-            part_id=action.part_id,
+    span = (as_of - closed_on).days // 7
+    if span <= 0:
+        return []
+
+    end = closed_on + timedelta(days=7 * span)
+    totals = await _loss_by_week(
+        session,
+        plant_id=plant.id,
+        station_id=action.station_id,
+        reason_code_id=action.reason_code_id,
+        start=closed_on,
+        end=end,
+        loss_source=action.loss_source or LOSS_DOWNTIME,
+        part_id=action.part_id,
+    )
+    return [
+        WeeklyLoss(closed_on + timedelta(days=7 * index), totals.get(index, 0))
+        for index in range(span)
+    ]
+
+
+async def _loss_by_week(
+    session: AsyncSession,
+    *,
+    plant_id: uuid.UUID,
+    station_id: uuid.UUID | None,
+    reason_code_id: uuid.UUID | None,
+    start: date,
+    end: date,
+    loss_source: str,
+    part_id: uuid.UUID | None,
+) -> dict[int, int]:
+    """``{week index from start: paise}`` for ``start <= business_date < end``.
+
+    The buckets are seven days from ``start``, not calendar weeks: an Action's
+    weeks are measured from the day its fix landed. Weeks with no loss are
+    absent, and the caller reads them as zero — which is the point of the
+    measurement.
+    """
+    if end <= start:
+        return {}
+
+    model = QualityRecord if loss_source == LOSS_QUALITY else DowntimeEvent
+    if loss_source != LOSS_QUALITY and reason_code_id is None:
+        return {}
+
+    query = (
+        select(model.business_date, func.coalesce(func.sum(model.cost_total), 0))
+        .where(
+            model.plant_id == plant_id,
+            model.business_date >= start,
+            model.business_date < end,
         )
-        weeks.append(WeeklyLoss(week_start, loss))
-        week_start = week_end
-    return weeks
+        .group_by(model.business_date)
+    )
+    if loss_source == LOSS_QUALITY:
+        if part_id is not None:
+            query = query.where(model.part_id == part_id)
+    else:
+        query = query.where(model.reason_code_id == reason_code_id)
+    if station_id is not None:
+        query = query.where(model.station_id == station_id)
+
+    # Bucketed here rather than in SQL: the grouping key is "days since this
+    # Action closed", which is not a calendar week, and the row count is one
+    # per day that actually lost money — small, and already in hand.
+    totals: dict[int, int] = {}
+    for business_date, cost in (await session.execute(query)).all():
+        index = (business_date - start).days // 7
+        totals[index] = totals.get(index, 0) + int(cost or 0)
+    return totals
 
 
 async def accrue_recovered_profit(

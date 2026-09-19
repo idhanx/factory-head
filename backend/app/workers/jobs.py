@@ -32,7 +32,8 @@ from app.models import (
 )
 from app.services import actions as action_service
 from app.services import compliance as compliance_service
-from app.services import notifications
+from app.services import kaizen as kaizen_service
+from app.services import kaizen_patterns, notifications
 from app.services import reports as report_service
 from app.services import skills as skills_service
 from app.services.clock import plant_now, plant_today
@@ -408,3 +409,53 @@ async def refresh_plugins() -> None:
                 await session.commit()
         except Exception as exc:  # pragma: no cover - logged for the operator
             log.error("worker.refresh_plugins_failed", plant_id=str(plant_id), error=str(exc))
+
+
+async def sync_kaizen() -> None:
+    """Pull every Kaizen's status from the Core Action its approval created (§9).
+
+    Runs hourly, right behind the Recovered Profit accrual that feeds it. The
+    operator-facing progress view and the points-on-verification award both hang
+    off this: an operator's biggest points award lands 2-6 weeks after
+    implementation, when Core says the saving actually held.
+    """
+    async with SessionFactory() as session:
+        plant_ids = await _active_plant_ids(session)
+
+    for plant_id in plant_ids:
+        try:
+            async with SessionFactory() as session:
+                await set_plant_scope(session, plant_id)
+                plant = await session.get(Plant, plant_id)
+                changed = await kaizen_service.sync_with_actions(session, plant=plant)
+                await session.commit()
+                if changed:
+                    log.info("worker.kaizen_synced", plant_id=str(plant_id), changed=changed)
+        except Exception as exc:  # pragma: no cover - logged for the operator
+            log.error("worker.kaizen_sync_failed", plant_id=str(plant_id), error=str(exc))
+
+
+async def detect_kaizen_patterns() -> None:
+    """Cluster Kaizen submissions against Core events (§10). Weekly.
+
+    Weekly rather than continuously because a pattern is a management decision,
+    not an alert: seventeen reports over four months do not become urgent on a
+    Tuesday afternoon, and re-raising the same cluster daily would train a plant
+    head to ignore it.
+    """
+    async with SessionFactory() as session:
+        plant_ids = await _active_plant_ids(session)
+
+    for plant_id in plant_ids:
+        try:
+            async with SessionFactory() as session:
+                await set_plant_scope(session, plant_id)
+                plant = await session.get(Plant, plant_id)
+                found = await kaizen_patterns.detect(session, plant=plant)
+                await session.commit()
+                if found:
+                    log.info(
+                        "worker.kaizen_patterns", plant_id=str(plant_id), patterns=len(found)
+                    )
+        except Exception as exc:  # pragma: no cover - logged for the operator
+            log.error("worker.kaizen_patterns_failed", plant_id=str(plant_id), error=str(exc))

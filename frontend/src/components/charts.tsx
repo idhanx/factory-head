@@ -1,5 +1,6 @@
 "use client";
 
+import type * as React from "react";
 import { useState } from "react";
 import {
   Area,
@@ -15,7 +16,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { formatInr, formatInrCompact } from "@/lib/format";
+import { formatInr, formatInrCompact, activeLocale } from "@/lib/format";
+import { useT } from "@/lib/i18n";
 
 /**
  * Charts for the owner's screens.
@@ -55,7 +57,7 @@ const axisProps = {
 
 function shortDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return d.toLocaleDateString(activeLocale(), { day: "numeric", month: "short" });
 }
 
 /** Tooltip chrome. Values wear text tokens; the colour sits in the swatch. */
@@ -102,6 +104,7 @@ export interface LossPoint {
 }
 
 export function LossTrend({ data, height = 240 }: { data: LossPoint[]; height?: number }) {
+  const t = useT();
   const [asTable, setAsTable] = useState(false);
   const peak = Math.max(...data.map((d) => d.recoverable), 0);
   const peakDay = data.find((d) => d.recoverable === peak);
@@ -114,16 +117,16 @@ export function LossTrend({ data, height = 240 }: { data: LossPoint[]; height?: 
           onClick={() => setAsTable(false)}
           className="text-2 mb-3 text-xs font-medium underline-offset-2 hover:underline"
         >
-          Show chart
+          {t("Show chart")}
         </button>
         <div className="max-h-64 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="surface sticky top-0">
               <tr className="border-b">
-                <th className="label py-1.5 text-left">Day</th>
-                <th className="label py-1.5 text-right">Recoverable</th>
-                <th className="label py-1.5 text-right">Structural</th>
-                <th className="label py-1.5 text-right">Downtime</th>
+                <th className="label py-1.5 text-left">{t("Day")}</th>
+                <th className="label py-1.5 text-right">{t("Recoverable")}</th>
+                <th className="label py-1.5 text-right">{t("Structural")}</th>
+                <th className="label py-1.5 text-right">{t("Downtime")}</th>
               </tr>
             </thead>
             <tbody>
@@ -137,7 +140,7 @@ export function LossTrend({ data, height = 240 }: { data: LossPoint[]; height?: 
                     {formatInr(point.structural)}
                   </td>
                   <td className="tnum text-2 py-1.5 text-right">
-                    {Math.round(point.minutes)} min
+                    {t("{0} min", { 0: Math.round(point.minutes) })}
                   </td>
                 </tr>
               ))}
@@ -153,11 +156,11 @@ export function LossTrend({ data, height = 240 }: { data: LossPoint[]; height?: 
       {/* Legend, always present for two series — identity is never carried by
           colour alone. */}
       <div className="mb-3 flex flex-wrap items-center gap-4">
-        <LegendKey colour={LOSS} label="Recoverable" />
-        <LegendKey colour={STRUCTURAL} label="Structural" muted />
+        <LegendKey colour={LOSS} label={t("Recoverable")} />
+        <LegendKey colour={STRUCTURAL} label={t("Structural")} muted />
         {peakDay ? (
           <span className="text-3 ml-auto text-xs">
-            Worst day {shortDate(peakDay.date)} · {formatInr(peak)}
+            {t("Worst day {0} · {1}", { 0: shortDate(peakDay.date), 1: formatInr(peak) })}
           </span>
         ) : null}
         {/* A table twin, so no value is reachable only by hovering. */}
@@ -166,7 +169,7 @@ export function LossTrend({ data, height = 240 }: { data: LossPoint[]; height?: 
           onClick={() => setAsTable(true)}
           className="text-3 text-xs font-medium underline-offset-2 hover:underline"
         >
-          Table
+          {t("Table")}
         </button>
       </div>
 
@@ -201,17 +204,17 @@ export function LossTrend({ data, height = 240 }: { data: LossPoint[]; height?: 
                   title={shortDate(String(label))}
                   rows={[
                     {
-                      label: "Recoverable",
+                      label: t("Recoverable"),
                       value: formatInr(Number(payload[0]?.payload.recoverable ?? 0)),
                       colour: LOSS,
                     },
                     {
-                      label: "Structural",
+                      label: t("Structural"),
                       value: formatInr(Number(payload[0]?.payload.structural ?? 0)),
                       colour: STRUCTURAL,
                     },
                     {
-                      label: "Downtime",
+                      label: t("Downtime"),
                       value: `${Math.round(Number(payload[0]?.payload.minutes ?? 0))} min`,
                     },
                   ]}
@@ -257,11 +260,11 @@ export function RecoveredTrend({
   data: Array<{ week: string; saving: number; cumulative: number }>;
   height?: number;
 }) {
+  const t = useT();
   if (data.length === 0) {
     return (
       <p className="text-3 py-10 text-center text-sm">
-        Nothing verified yet. Savings are credited only after a fix has held for
-        two consecutive weeks.
+        {t("Nothing verified yet. Savings are credited only after a fix has held for two consecutive weeks.")}
       </p>
     );
   }
@@ -277,15 +280,15 @@ export function RecoveredTrend({
           content={({ active, payload, label }) =>
             active && payload?.length ? (
               <TipShell
-                title={`Week of ${shortDate(String(label))}`}
+                title={t("Week of {0}", { 0: shortDate(String(label)) })}
                 rows={[
                   {
-                    label: "Credited",
+                    label: t("Credited"),
                     value: formatInr(Number(payload[0]?.payload.saving ?? 0)),
                     colour: RECOVERED,
                   },
                   {
-                    label: "Cumulative",
+                    label: t("Cumulative"),
                     value: formatInr(Number(payload[0]?.payload.cumulative ?? 0)),
                   },
                 ]}
@@ -316,10 +319,27 @@ export interface RankedItem {
   sublabel?: string;
   value: number;
   display: string;
+  /** A trend arrow or secondary figure, shown beside the direct label. */
+  meta?: React.ReactNode;
 }
 
-export function RankedBars({ items, max }: { items: RankedItem[]; max?: number }) {
+export function RankedBars({
+  items,
+  max,
+  tone = "loss",
+}: {
+  items: RankedItem[];
+  max?: number;
+  /** The measure's own colour. Still ONE hue across all bars — see note 1. */
+  tone?: "loss" | "accent" | "recovered" | "neutral";
+}) {
   const ceiling = max ?? Math.max(...items.map((i) => i.value), 1);
+  const colour = {
+    loss: LOSS,
+    accent: "var(--color-accent)",
+    recovered: RECOVERED,
+    neutral: "var(--color-ink-400)",
+  }[tone];
 
   // A plain HTML bar list rather than a chart component: at this size it gives
   // better label control, wraps properly on a phone, and stays readable when
@@ -342,8 +362,11 @@ export function RankedBars({ items, max }: { items: RankedItem[]; max?: number }
               </span>
               {/* Direct label on every bar — the secondary encoding that keeps
                   this readable without relying on the fill. */}
-              <span className="money shrink-0 text-sm font-semibold text-[var(--color-loss)]">
-                {item.display}
+              <span className="flex shrink-0 items-baseline gap-2">
+                <span className="money text-sm font-semibold" style={{ color: colour }}>
+                  {item.display}
+                </span>
+                {item.meta}
               </span>
             </div>
             <div className="surface-inset h-2 overflow-hidden rounded-full">
@@ -352,8 +375,8 @@ export function RankedBars({ items, max }: { items: RankedItem[]; max?: number }
                   would double-encode the length the bar already shows, and burn
                   the only free channel on information that is already there. */}
               <div
-                className="h-full rounded-full bg-[var(--color-loss)] transition-[width] duration-700 ease-out"
-                style={{ width: `${pct}%` }}
+                className="h-full rounded-full transition-[width] duration-700 ease-out"
+                style={{ width: `${pct}%`, background: colour }}
               />
             </div>
           </li>
@@ -493,3 +516,146 @@ function LegendKey({
 }
 
 export { Bar, BarChart, Cell };
+
+
+/* ---------------------------------------------------------------------- */
+/* Trend — one measure over time, for a KPI that is not money              */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * A single series needs no legend: the panel title names it. A target line is
+ * drawn as a dashed rule rather than a second series, because it is a
+ * reference, not a measurement — giving it the same weight as the data would
+ * invite the eye to compare two things that were never the same kind of thing.
+ */
+export function TrendLine({
+  data,
+  dataKey = "value",
+  label,
+  tone = "accent",
+  height = 200,
+  format = (n: number) => String(Math.round(n)),
+  target,
+  targetLabel = "Target",
+}: {
+  data: Array<Record<string, number | string>>;
+  dataKey?: string;
+  label: string;
+  tone?: "loss" | "recovered" | "accent";
+  height?: number;
+  format?: (value: number) => string;
+  target?: number;
+  targetLabel?: string;
+}) {
+  const t = useT();
+  const colour = { loss: LOSS, recovered: RECOVERED, accent: "var(--color-accent)" }[tone];
+
+  if (data.length === 0) {
+    return (
+      <div
+        className="text-3 grid place-items-center text-xs"
+        style={{ height }}
+      >
+        {t("Not enough history yet.")}
+      </div>
+    );
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+        <CartesianGrid stroke={GRID} vertical={false} />
+        <XAxis dataKey="date" tickFormatter={shortDate} minTickGap={28} {...axisProps} />
+        <YAxis tickFormatter={(v: number) => format(v)} width={56} {...axisProps} />
+        <Tooltip
+          cursor={{ stroke: GRID, strokeWidth: 1 }}
+          content={({ active, payload, label: at }) => {
+            if (!active || !payload?.length) return null;
+            return (
+              <TipShell
+                title={shortDate(String(at))}
+                rows={[
+                  {
+                    label,
+                    value: format(Number(payload[0].value)),
+                    colour,
+                  },
+                ]}
+              />
+            );
+          }}
+        />
+        {target !== undefined ? (
+          <Line
+            dataKey={() => target}
+            stroke={TICK}
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            dot={false}
+            isAnimationActive={false}
+            name={targetLabel}
+          />
+        ) : null}
+        <Line
+          type="monotone"
+          dataKey={dataKey}
+          stroke={colour}
+          strokeWidth={2}
+          dot={false}
+          activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+
+/* ---------------------------------------------------------------------- */
+/* Gauge — one bounded percentage, where the number is the headline        */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * A bar, not a dial. A percentage is a magnitude on a bounded scale, and a bar
+ * reads that in one glance; a dial spends twice the space to say the same
+ * thing less precisely.
+ *
+ * Bands carry an icon-free status colour AND the figure itself, so the state is
+ * never colour alone.
+ */
+export function Gauge({
+  value,
+  bands = [
+    { upTo: 60, tone: "stopped" },
+    { upTo: 85, tone: "warn" },
+    { upTo: 100, tone: "running" },
+  ],
+  height = 8,
+}: {
+  value: number;
+  bands?: Array<{ upTo: number; tone: "stopped" | "warn" | "running" }>;
+  height?: number;
+}) {
+  const t = useT();
+  const pct = Math.max(0, Math.min(100, value));
+  const band = bands.find((b) => pct <= b.upTo) ?? bands[bands.length - 1];
+  const colour = {
+    stopped: "var(--color-stopped)",
+    warn: "var(--color-warn)",
+    running: "var(--color-running)",
+  }[band.tone];
+
+  return (
+    <div
+      className="surface-inset w-full overflow-hidden rounded-full"
+      style={{ height }}
+      role="img"
+      aria-label={t("{0} percent", { 0: Math.round(pct) })}
+    >
+      <div
+        className="h-full rounded-full transition-[width] duration-700 ease-out"
+        style={{ width: `${pct}%`, background: colour }}
+      />
+    </div>
+  );
+}

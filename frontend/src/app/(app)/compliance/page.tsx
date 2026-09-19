@@ -7,13 +7,14 @@ import {
 } from "lucide-react";
 import { api, loadSession } from "@/lib/api";
 import { can } from "@/lib/roles";
-import { formatInr } from "@/lib/format";
+import { formatInr, activeLocale } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, ErrorNote, Skeleton } from "@/components/ui/misc";
 import type { AuditPack, Clause, ComplianceOverview } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * Compliance / Audit AI (§3 Layer 5).
@@ -43,6 +44,7 @@ const STATUS = {
 } as const;
 
 export default function Compliance() {
+  const t = useT();
   const session = loadSession();
   const queryClient = useQueryClient();
   const canPack = session ? can(session.roles, "owner", "quality", "consultant") : false;
@@ -76,21 +78,21 @@ export default function Compliance() {
   const rescoreButton = canRescore ? (
     <Button size="lg" variant="outline" onClick={() => rescore.mutate()} disabled={rescore.isPending}>
       <RefreshCw className={cn("size-4", rescore.isPending && "animate-spin")} />
-      {rescore.isPending ? "Re-scoring…" : "Re-score now"}
+      {rescore.isPending ? t("Re-scoring…") : t("Re-score now")}
     </Button>
   ) : null;
   const rescoreError = rescore.error ? (
-    <ErrorNote message={`Could not re-score: ${rescore.error.message}`} />
+    <ErrorNote message={t("Could not re-score: {0}", { 0: rescore.error.message })} />
   ) : null;
 
   if (overview.isLoading) return <Skeleton className="h-[32rem]" />;
   if (overview.error) {
     return (
       <div className="space-y-4">
-        <h1 className="display text-[1.75rem] font-bold">Audit readiness</h1>
-        <ErrorNote message={`Could not load audit readiness: ${overview.error.message}`} />
+        <h1 className="display text-[1.75rem] font-bold">{t("Audit readiness")}</h1>
+        <ErrorNote message={t("Could not load audit readiness: {0}", { 0: overview.error.message })} />
         <Button size="lg" variant="outline" onClick={() => void overview.refetch()}>
-          Try again
+          {t("Try again")}
         </Button>
       </div>
     );
@@ -99,8 +101,8 @@ export default function Compliance() {
     return (
       <div className="space-y-4">
         <Empty
-          title="Not scored yet"
-          hint={canRescore ? "Score the plant's records against the clauses now." : "Ask the owner or quality lead to run the first score."}
+          title={t("Not scored yet")}
+          hint={canRescore ? t("Score the plant's records against the clauses now.") : t("Ask the owner or quality lead to run the first score.")}
           action={rescoreButton}
         />
         {rescoreError}
@@ -120,24 +122,23 @@ export default function Compliance() {
         <div>
           <p className="label mb-1.5 flex items-center gap-1.5">
             <ShieldCheck className="size-3" />
-            Layer 5 · Compliance / Audit AI
+            {t("Layer 5 · Compliance / Audit AI")}
           </p>
-          <h1 className="display text-[1.75rem] font-bold">Audit readiness</h1>
+          <h1 className="display text-[1.75rem] font-bold">{t("Audit readiness")}</h1>
           <p className="text-2 mt-1 max-w-2xl text-sm leading-relaxed">
-            Scored from what the plant records every shift. No three-week scramble
-            before the auditor arrives — the evidence has been accumulating all along.
+            {t("Scored from what the plant records every shift. No three-week scramble before the auditor arrives — the evidence has been accumulating all along.")}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-6">
           {rescoreButton}
           <div className="text-right">
-            <p className="label mb-1">Overall, last 90 days</p>
+            <p className="label mb-1">{t("Overall, last 90 days")}</p>
             <span className="figure text-[2.75rem] font-bold leading-none">
               {d.overall_score}
               <span className="text-3 text-xl">%</span>
             </span>
             <p className="text-3 mt-1 text-xs">
-              {d.ready} ready · {d.partial} partial · {d.gaps} gap{d.gaps === 1 ? "" : "s"}
+              {t("{0} ready · {1} partial · {2} gap{3}", { 0: d.ready, 1: d.partial, 2: d.gaps, 3: d.gaps === 1 ? "" : "s" })}
             </p>
           </div>
         </div>
@@ -145,7 +146,7 @@ export default function Compliance() {
 
       {rescoreError}
       {rescore.isSuccess ? (
-        <p role="status" className="text-3 text-xs">Re-scored just now from the latest records.</p>
+        <p role="status" className="text-3 text-xs">{t("Re-scored just now from the latest records.")}</p>
       ) : null}
 
       {/* ---- per standard ------------------------------------------------ */}
@@ -181,7 +182,7 @@ export default function Compliance() {
               />
             </div>
             <p className="text-3 mt-2 text-xs">
-              {standard === key ? "Showing only this standard" : "Tap to filter"}
+              {standard === key ? t("Showing only this standard") : t("Tap to filter")}
             </p>
           </button>
         ))}
@@ -193,10 +194,9 @@ export default function Compliance() {
           <CardContent className="flex flex-wrap items-center gap-3 pt-5">
             <FileCheck2 className="size-5 text-[var(--color-accent)]" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">Freeze an evidence pack</p>
+              <p className="font-semibold">{t("Freeze an evidence pack")}</p>
               <p className="text-3 text-xs">
-                Frozen on purpose — you can always show an auditor exactly what was handed
-                over on a given date, not a live view that has since moved on.
+                {t("Frozen on purpose — you can always show an auditor exactly what was handed over on a given date, not a live view that has since moved on.")}
               </p>
             </div>
             {Object.keys(d.by_standard).map((key) => (
@@ -220,9 +220,9 @@ export default function Compliance() {
             <CardContent>
               <div className="surface-2 rise rounded-xl border px-4 py-3 text-sm" role="status">
                 <span className="font-semibold">{STANDARDS[pack.standard] ?? pack.standard}</span>{" "}
-                pack frozen for {pack.period_start} → {pack.period_end}: readiness{" "}
+                {t("pack frozen for")}{" "}{pack.period_start} → {pack.period_end}{t(": readiness")}{" "}
                 <span className="font-semibold">{pack.readiness_score}%</span>, {pack.clause_count}{" "}
-                clauses, {pack.evidence_rows} evidence records.
+                {t("clauses,")}{" "}{pack.evidence_rows} {" "}{t("evidence records.")}
               </div>
             </CardContent>
           ) : null}
@@ -233,10 +233,10 @@ export default function Compliance() {
       <section>
         <div className="mb-2.5 flex items-center gap-3">
           <h2 className="label">
-            Clauses {standard !== "all" ? `· ${STANDARDS[standard] ?? standard}` : ""}
+            {t("Clauses {0}", { 0: standard !== "all" ? `· ${STANDARDS[standard] ?? standard}` : "" })}
           </h2>
           <span className="hairline flex-1" />
-          <span className="text-3 text-xs">gaps first</span>
+          <span className="text-3 text-xs">{t("gaps first")}</span>
         </div>
         <div className="space-y-2">
           {gapsFirst.map((clause, index) => (
@@ -253,6 +253,7 @@ function rankStatus(status: Clause["status"]) {
 }
 
 function ClauseRow({ clause, index }: { clause: Clause; index: number }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const status = STATUS[clause.status];
   const evidence = useQuery({
@@ -290,16 +291,14 @@ function ClauseRow({ clause, index }: { clause: Clause; index: number }) {
             <span className="text-3 text-xs font-semibold">
               {STANDARDS[clause.standard] ?? clause.standard} {clause.clause_ref}
             </span>
-            <Badge variant={status.variant}>{status.label}</Badge>
+            <Badge variant={status.variant}>{t(status.label)}</Badge>
             <span className="text-3 tnum text-xs">
-              {clause.evidence_count.toLocaleString("en-IN")} record
-              {clause.evidence_count === 1 ? "" : "s"}
-              {clause.last_evidence_at
-                ? ` · latest ${new Date(clause.last_evidence_at).toLocaleDateString("en-IN", {
+              {t("{0} record{1}{2}", { 0: clause.evidence_count.toLocaleString("en-IN"), 1: clause.evidence_count === 1 ? "" : "s", 2: clause.last_evidence_at
+                ? t(" · latest {0}", { 0: new Date(clause.last_evidence_at).toLocaleDateString(activeLocale(), {
                     day: "numeric",
                     month: "short",
-                  })}`
-                : ""}
+                  }) })
+                : "" })}
             </span>
           </div>
           <p className="mt-0.5 font-semibold leading-snug">{clause.title}</p>
@@ -318,14 +317,14 @@ function ClauseRow({ clause, index }: { clause: Clause; index: number }) {
         <div className="surface-2 border-t px-4 py-3.5">
           {clause.requirement ? (
             <p className="text-2 mb-3 text-xs leading-relaxed">
-              <span className="font-semibold text-[var(--text)]">Requirement:</span>{" "}
+              <span className="font-semibold text-[var(--text)]">{t("Requirement:")}</span>{" "}
               {clause.requirement}
             </p>
           ) : null}
           {clause.also_satisfies.length ? (
             <div className="mb-3 flex flex-wrap items-center gap-1.5">
               <Link2 className="text-3 size-3.5" />
-              <span className="text-3 text-xs">Same evidence also satisfies</span>
+              <span className="text-3 text-xs">{t("Same evidence also satisfies")}</span>
               {clause.also_satisfies.map((ref) => {
                 const [std, cl] = ref.split(":");
                 return (
@@ -339,7 +338,7 @@ function ClauseRow({ clause, index }: { clause: Clause; index: number }) {
           {evidence.isLoading ? (
             <Skeleton className="h-24" />
           ) : evidence.error ? (
-            <ErrorNote message={`Could not load the evidence: ${evidence.error.message}`} />
+            <ErrorNote message={t("Could not load the evidence: {0}", { 0: evidence.error.message })} />
           ) : (
             <EvidenceTable rows={evidence.data?.evidence ?? []} status={clause.status} />
           )}
@@ -356,12 +355,13 @@ function EvidenceTable({
   rows: Array<Record<string, unknown>>;
   status: Clause["status"];
 }) {
+  const t = useT();
   if (rows.length === 0) {
     return (
       <p className="text-3 py-4 text-center text-xs">
         {status === "gap"
-          ? "Nothing to show an auditor yet — the note above says what to start recording."
-          : "This clause is evidenced by its record count; open the related screen for detail."}
+          ? t("Nothing to show an auditor yet — the note above says what to start recording.")
+          : t("This clause is evidenced by its record count; open the related screen for detail.")}
       </p>
     );
   }
@@ -393,7 +393,7 @@ function EvidenceTable({
         </tbody>
       </table>
       {rows.length >= 25 ? (
-        <p className="text-3 mt-2 text-xs">Showing the latest 25 records.</p>
+        <p className="text-3 mt-2 text-xs">{t("Showing the latest 25 records.")}</p>
       ) : null}
     </div>
   );

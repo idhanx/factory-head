@@ -7,6 +7,7 @@ import { formatInr, formatMinutes, minutesSince } from "@/lib/format";
 import { Money } from "@/components/ui/money";
 import { StatusLed } from "@/components/ui/badge";
 import type { LocalTile } from "@/lib/offline/grid";
+import { useT } from "@/lib/i18n";
 
 /**
  * One machine tile (Screen 2).
@@ -40,6 +41,7 @@ export function StationTileCard({
   onChangeJob?: (tile: LocalTile) => void;
   index?: number;
 }) {
+  const t = useT();
   const live = useLiveCost(tile);
   const stopped = tile.status === "stopped";
   const running = tile.status === "running";
@@ -60,7 +62,7 @@ export function StationTileCard({
             <h3 className="display text-[1.0625rem] font-bold">{tile.code}</h3>
             {stopped ? (
               <span className="rounded bg-[var(--color-stopped)] px-1.5 py-px text-[0.625rem] font-bold uppercase tracking-wider text-white">
-                Stopped
+                {t("Stopped")}
               </span>
             ) : (
               <StatusLed state={running ? "running" : "idle"} />
@@ -83,7 +85,7 @@ export function StationTileCard({
         {stopped ? (
           <>
             <p className="text-[0.6875rem] font-semibold uppercase tracking-wide text-[var(--color-loss)]">
-              {tile.reason_label ?? "Reason not set"}
+              {tile.reason_label ?? t("Reason not set")}
             </p>
             <div className="mt-0.5 flex items-baseline gap-2">
               {tile.pending ? (
@@ -146,25 +148,31 @@ export function StationTileCard({
           <button
             type="button"
             onClick={() => onStart(tile)}
+            // The word on the button is the state being reported, which is the
+            // right label to tap but the wrong thing to hear: read out on its
+            // own, "Running" describes a machine that is stopped. The spoken
+            // name says what the tap does instead.
+            aria-label={t("Mark {0} running again", { 0: tile.code })}
             className="touch flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-running)] text-sm font-bold text-white shadow-[var(--shadow-2)] transition-[filter,transform] active:translate-y-px hover:brightness-110"
           >
             <Triangle className="size-4 rotate-90 fill-current" />
-            Running
+            {t("Running")}
           </button>
         ) : (
           <>
             <button
               type="button"
               onClick={() => onStop(tile)}
+              aria-label={t("Record that {0} has stopped", { 0: tile.code })}
               className="touch flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-stopped)] text-sm font-bold text-white shadow-[var(--shadow-2)] transition-[filter,transform] active:translate-y-px hover:brightness-110"
             >
               <Square className="size-3.5 fill-current" />
-              Stopped
+              {t("Stopped")}
             </button>
             <button
               type="button"
               onClick={() => onCount(tile)}
-              aria-label={`Enter production count for ${tile.code}`}
+              aria-label={t("Enter production count for {0}", { 0: tile.code })}
               className="touch surface grid w-14 place-items-center rounded-xl border shadow-[var(--shadow-1)] transition-colors hover:surface-2"
             >
               <Plus className="size-5" />
@@ -177,25 +185,25 @@ export function StationTileCard({
         <button
           type="button"
           onClick={() => onChangeJob(tile)}
-          aria-label={`Change job on ${tile.code}`}
+          aria-label={t("Change job on {0}", { 0: tile.code })}
           className="text-2 mt-2 flex min-h-11 items-center justify-center gap-2 rounded-xl border text-[0.8125rem] font-medium transition-colors hover:surface-2 hover:text-[var(--text)]"
         >
           <ArrowLeftRight className="size-3.5" />
-          Change job
+          {t("Change job")}
         </button>
       ) : null}
 
       {tile.pending ? (
         <p className="mt-3 flex items-center gap-1.5 text-[0.6875rem] font-semibold text-[var(--color-warn)]">
           <Hourglass className="size-3" />
-          Saved on this tablet — will sync
+          {t("Saved on this tablet — will sync")}
         </p>
       ) : null}
 
       {tile.shift_cost_paise > 0 ? (
         <p className="text-3 mt-3 flex items-center gap-1.5 text-[0.6875rem]">
           <Gauge className="size-3" />
-          Lost this shift <span className="money font-semibold">{formatInr(tile.shift_cost_paise)}</span>
+          {t("Lost this shift")}{" "}<span className="money font-semibold">{formatInr(tile.shift_cost_paise)}</span>
         </p>
       ) : null}
     </article>

@@ -11,6 +11,7 @@ import {
 } from "@/components/job-orders";
 import type { JobOrder, JobStatus } from "@/types/api";
 import { DataTable, ListState, Notice, RecordForm, RowButton, Toolbar, toValues, type FieldSpec } from "./shared";
+import { useT } from "@/lib/i18n";
 
 /**
  * Job orders, for the office. The floor creates them from Shift Start; this is
@@ -28,6 +29,7 @@ const EDIT_FIELDS: FieldSpec[] = [
 ];
 
 export function JobOrdersTab() {
+  const t = useT();
   const queryClient = useQueryClient();
   const [showClosed, setShowClosed] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -47,11 +49,11 @@ export function JobOrdersTab() {
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: ["jobs"] });
       setEditing(null);
-      setNotice(`Job #${saved.job_number} saved.`);
+      setNotice(t("Job #{0} saved.", { 0: saved.job_number }));
     },
     // The edit sheet shows its own error; a status change from the table needs one here.
     onError: (e: Error, { job }) => {
-      if (!editing) setNotice(`Could not update job #${job.job_number}: ${e.message}`);
+      if (!editing) setNotice(t("Could not update job #{0}: {1}", { 0: job.job_number, 1: e.message }));
     },
   });
 
@@ -60,8 +62,8 @@ export function JobOrdersTab() {
   return (
     <div>
       <Toolbar
-        title="Job orders"
-        hint="Mark a job completed or cancelled and it leaves the station pickers. Nothing recorded against it changes."
+        title={t("Job orders")}
+        hint={t("Mark a job completed or cancelled and it leaves the station pickers. Nothing recorded against it changes.")}
         showInactive={showClosed}
         onShowInactive={setShowClosed}
         inactiveLabel="Show completed and cancelled"
@@ -75,7 +77,7 @@ export function JobOrdersTab() {
         error={jobs.error}
         empty={rows.length === 0}
         emptyTitle="No open job orders"
-        emptyHint="Create one here or from the Shift screen."
+        emptyHint={t("Create one here or from the Shift screen.")}
         onRetry={() => void jobs.refetch()}
       >
         <DataTable
@@ -91,7 +93,7 @@ export function JobOrdersTab() {
               header: "Status",
               cell: (j) => (
                 <Select
-                  aria-label={`Status of job ${j.job_number}`}
+                  aria-label={t("Status of job {0}", { 0: j.job_number })}
                   value={j.status}
                   disabled={update.isPending}
                   onChange={(e) =>
@@ -121,13 +123,13 @@ export function JobOrdersTab() {
                   update.reset();
                   setEditing(j);
                 }}
-                aria-label={`Edit job ${j.job_number}`}
+                aria-label={t("Edit job {0}", { 0: j.job_number })}
               >
-                Edit
+                {t("Edit")}
               </RowButton>
-              <RowButton onClick={() => setRepeating(j)} aria-label={`Repeat job ${j.job_number}`}>
+              <RowButton onClick={() => setRepeating(j)} aria-label={t("Repeat job {0}", { 0: j.job_number })}>
                 <Repeat className="size-3.5" />
-                Repeat
+                {t("Repeat")}
               </RowButton>
             </>
           )}
@@ -137,18 +139,18 @@ export function JobOrdersTab() {
       {creating ? (
         <NewJobOrderSheet
           onClose={() => setCreating(false)}
-          onCreated={(job) => setNotice(`Job #${job.job_number} created.`)}
+          onCreated={(job) => setNotice(t("Job #{0} created.", { 0: job.job_number }))}
         />
       ) : null}
       {repeating ? (
         <RepeatJobOrderSheet
           job={repeating}
           onClose={() => setRepeating(null)}
-          onCreated={(job) => setNotice(`Job #${job.job_number} created from #${repeating.job_number}.`)}
+          onCreated={(job) => setNotice(t("Job #{0} created from #{1}.", { 0: job.job_number, 1: repeating.job_number }))}
         />
       ) : null}
       {editing ? (
-        <Sheet title={`Edit job #${editing.job_number}`} onClose={() => setEditing(null)}>
+        <Sheet title={t("Edit job #{0}", { 0: editing.job_number })} onClose={() => setEditing(null)}>
           <RecordForm
             idPrefix="job-edit"
             fields={EDIT_FIELDS}

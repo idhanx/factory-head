@@ -11,6 +11,7 @@ import { ErrorNote } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import type { AdminUser, Role } from "@/types/api";
 import { DataTable, ListState, Notice, RowButton, Toolbar } from "./shared";
+import { useLanguage, useT } from "@/lib/i18n";
 
 /**
  * People who log in to this plant.
@@ -35,12 +36,24 @@ const PLANT_ROLES: Role[] = ["owner", "supervisor", "quality", "maintenance", "s
 const ADMIN_ONLY_ROLES: Role[] = ["consultant", "admin"];
 const PROTECTED_SELF_ROLES: Role[] = ["owner", "admin"];
 
-function formatLogin(iso: string | null) {
-  if (!iso) return <span className="text-3">Never</span>;
-  return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+function FormatLogin({ iso }: { iso: string | null }) {
+  const t = useT();
+  const { locale } = useLanguage();
+  if (!iso) return <span className="text-3">{t("Never")}</span>;
+  return (
+    <>
+      {new Date(iso).toLocaleString(locale, {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })}
+    </>
+  );
 }
 
 export function UsersTab() {
+  const t = useT();
   const queryClient = useQueryClient();
   const session = loadSession();
   const isAdmin = session?.roles.includes("admin") ?? false;
@@ -60,7 +73,7 @@ export function UsersTab() {
     onSuccess: (_u, user) => {
       refresh();
       setRemoving(null);
-      setNotice(`${user.full_name} can no longer open this plant.`);
+      setNotice(t("{0} can no longer open this plant.", { 0: user.full_name }));
     },
   });
 
@@ -71,8 +84,8 @@ export function UsersTab() {
   return (
     <div>
       <Toolbar
-        title="Users"
-        hint="Everyone who logs in to this plant, and what they can see. Operators are not users — they are names in the Operators tab."
+        title={t("Users")}
+        hint={t("Everyone who logs in to this plant, and what they can see. Operators are not users — they are names in the Operators tab.")}
         showInactive={showInactive}
         onShowInactive={setShowInactive}
         inactiveLabel="Show people without access"
@@ -97,7 +110,7 @@ export function UsersTab() {
               cell: (u) => (
                 <span className="font-semibold">
                   {u.full_name}
-                  {u.id === session?.user_id ? <span className="text-3 font-normal"> (you)</span> : null}
+                  {u.id === session?.user_id ? <span className="text-3 font-normal"> {t("(you)")}</span> : null}
                 </span>
               ),
             },
@@ -116,24 +129,24 @@ export function UsersTab() {
                   <span className="flex flex-wrap gap-1">
                     {u.roles.map((r) => (
                       <Badge key={r} variant={r === "owner" || r === "admin" ? "accent" : "neutral"}>
-                        {ROLE_INFO[r]?.label ?? r}
+                        {t(ROLE_INFO[r]?.label ?? r)}
                       </Badge>
                     ))}
                   </span>
                 ) : (
-                  <Badge variant="neutral">No access</Badge>
+                  <Badge variant="neutral">{t("No access")}</Badge>
                 ),
             },
-            { header: "Last login", cell: (u) => <span className="whitespace-nowrap">{formatLogin(u.last_login_at)}</span> },
+            { header: "Last login", cell: (u) => <span className="whitespace-nowrap"><FormatLogin iso={u.last_login_at} /></span> },
           ]}
           actions={(u) => (
             <>
-              <RowButton onClick={() => setEditing(u)} aria-label={`Edit ${u.full_name}`}>
-                Edit
+              <RowButton onClick={() => setEditing(u)} aria-label={t("Edit {0}", { 0: u.full_name })}>
+                {t("Edit")}
               </RowButton>
-              <RowButton onClick={() => setResetting(u)} aria-label={`Reset password for ${u.full_name}`}>
+              <RowButton onClick={() => setResetting(u)} aria-label={t("Reset password for {0}", { 0: u.full_name })}>
                 <KeyRound className="size-3.5" />
-                Password
+                {t("Password")}
               </RowButton>
               {u.id !== session?.user_id && u.roles.length > 0 ? (
                 <RowButton
@@ -143,9 +156,9 @@ export function UsersTab() {
                     removeAccess.reset();
                     setRemoving(u);
                   }}
-                  aria-label={`Remove access for ${u.full_name}`}
+                  aria-label={t("Remove access for {0}", { 0: u.full_name })}
                 >
-                  Remove access
+                  {t("Remove access")}
                 </RowButton>
               ) : null}
             </>
@@ -162,7 +175,7 @@ export function UsersTab() {
           onSaved={(user, created) => {
             refresh();
             setEditing(null);
-            setNotice(created ? `${user.full_name} added.` : `${user.full_name} saved.`);
+            setNotice(created ? t("{0} added.", { 0: user.full_name }) : t("{0} saved.", { 0: user.full_name }));
           }}
         />
       ) : null}
@@ -173,16 +186,15 @@ export function UsersTab() {
           onClose={() => setResetting(null)}
           onSaved={() => {
             setResetting(null);
-            setNotice(`Password changed for ${resetting.full_name}. Tell them in person, not on WhatsApp.`);
+            setNotice(t("Password changed for {0}. Tell them in person, not on WhatsApp.", { 0: resetting.full_name }));
           }}
         />
       ) : null}
 
       {removing ? (
-        <Sheet title={`Remove ${removing.full_name}'s access?`} onClose={() => setRemoving(null)}>
+        <Sheet title={t("Remove {0}'s access?", { 0: removing.full_name })} onClose={() => setRemoving(null)}>
           <p className="text-2 text-sm leading-relaxed">
-            They will no longer be able to open this plant. Their name stays on everything they
-            recorded. You can give access back later by editing their roles.
+            {t("They will no longer be able to open this plant. Their name stays on everything they recorded. You can give access back later by editing their roles.")}
           </p>
           {removeAccess.error ? (
             <div className="mt-3">
@@ -196,10 +208,10 @@ export function UsersTab() {
               disabled={removeAccess.isPending}
               onClick={() => removeAccess.mutate(removing)}
             >
-              {removeAccess.isPending ? "Removing…" : "Yes, remove access"}
+              {removeAccess.isPending ? t("Removing…") : t("Yes, remove access")}
             </Button>
             <Button size="lg" variant="outline" onClick={() => setRemoving(null)}>
-              Keep access
+              {t("Keep access")}
             </Button>
           </div>
         </Sheet>
@@ -221,6 +233,7 @@ function UserSheet({
   onClose: () => void;
   onSaved: (user: AdminUser, created: boolean) => void;
 }) {
+  const t = useT();
   const creating = user === null;
   const isSelf = user !== null && user.id === selfId;
   const [fullName, setFullName] = useState(user?.full_name ?? "");
@@ -256,8 +269,8 @@ function UserSheet({
 
   return (
     <Sheet
-      title={creating ? "Add user" : `Edit ${user.full_name}`}
-      subtitle={creating ? "If someone with this email or phone already has a login, they are added to this plant and keep their own password." : undefined}
+      title={creating ? t("Add user") : t("Edit {0}", { 0: user.full_name })}
+      subtitle={creating ? t("If someone with this email or phone already has a login, they are added to this plant and keep their own password.") : undefined}
       onClose={onClose}
     >
       <form
@@ -265,31 +278,31 @@ function UserSheet({
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!fullName.trim()) return setInvalid("Enter the person's name.");
-          if (!email.trim() && !phone.trim()) return setInvalid("Enter an email or a phone number — it is how they log in.");
-          if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) return setInvalid("That email address does not look right.");
-          if (creating && password.length < 8) return setInvalid("The password must be at least 8 characters.");
-          if (roles.length + untouchable.length === 0) return setInvalid("Pick at least one role.");
+          if (!fullName.trim()) return setInvalid(t("Enter the person's name."));
+          if (!email.trim() && !phone.trim()) return setInvalid(t("Enter an email or a phone number — it is how they log in."));
+          if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) return setInvalid(t("That email address does not look right."));
+          if (creating && password.length < 8) return setInvalid(t("The password must be at least 8 characters."));
+          if (roles.length + untouchable.length === 0) return setInvalid(t("Pick at least one role."));
           setInvalid(null);
           save.mutate();
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Label htmlFor="user-name">Full name</Label>
+            <Label htmlFor="user-name">{t("Full name")}</Label>
             <Input id="user-name" value={fullName} onChange={(e) => setFullName(e.target.value)} autoFocus />
           </div>
           <div>
-            <Label htmlFor="user-email">Email</Label>
+            <Label htmlFor="user-email">{t("Email")}</Label>
             <Input id="user-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
-            <Label htmlFor="user-phone">Phone</Label>
+            <Label htmlFor="user-phone">{t("Phone")}</Label>
             <Input id="user-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+91 98765 43210" />
           </div>
           {creating ? (
             <div className="sm:col-span-2">
-              <Label htmlFor="user-password">Password</Label>
+              <Label htmlFor="user-password">{t("Password")}</Label>
               <Input
                 id="user-password"
                 type="password"
@@ -297,13 +310,13 @@ function UserSheet({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <p className="text-3 mt-1 text-xs">At least 8 characters.</p>
+              <p className="text-3 mt-1 text-xs">{t("At least 8 characters.")}</p>
             </div>
           ) : null}
         </div>
 
         <fieldset>
-          <legend className="mb-1.5 text-sm font-medium">Roles in this plant</legend>
+          <legend className="mb-1.5 text-sm font-medium">{t("Roles in this plant")}</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {grantable.map((role) => {
               const locked = isSelf && PROTECTED_SELF_ROLES.includes(role) && (user?.roles ?? []).includes(role);
@@ -323,9 +336,9 @@ function UserSheet({
                     onChange={(e) => toggleRole(role, e.target.checked)}
                   />
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium">{ROLE_INFO[role].label}</span>
+                    <span className="block text-sm font-medium">{t(ROLE_INFO[role].label)}</span>
                     <span className="text-3 block text-xs">
-                      {locked ? "You cannot remove your own role" : ROLE_INFO[role].hint}
+                      {locked ? t("You cannot remove your own role") : t(ROLE_INFO[role].hint)}
                     </span>
                   </span>
                 </label>
@@ -334,7 +347,7 @@ function UserSheet({
           </div>
           {untouchable.length ? (
             <p className="text-3 mt-2 text-xs">
-              Also holds {untouchable.map((r) => ROLE_INFO[r]?.label ?? r).join(", ")} — only an admin can change that.
+              {t("Also holds {0} — only an admin can change that.", { 0: untouchable.map((r) => t(ROLE_INFO[r]?.label ?? r)).join(", ") })}
             </p>
           ) : null}
         </fieldset>
@@ -344,10 +357,10 @@ function UserSheet({
 
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="lg" disabled={save.isPending}>
-            {save.isPending ? "Saving…" : creating ? "Add user" : "Save changes"}
+            {save.isPending ? t("Saving…") : creating ? t("Add user") : t("Save changes")}
           </Button>
           <Button type="button" size="lg" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </form>
@@ -364,6 +377,7 @@ function PasswordSheet({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [invalid, setInvalid] = useState<string | null>(null);
@@ -374,21 +388,21 @@ function PasswordSheet({
   });
 
   return (
-    <Sheet title={`Reset password — ${user.full_name}`} onClose={onClose}>
+    <Sheet title={t("Reset password — {0}", { 0: user.full_name })} onClose={onClose}>
       <form
         noValidate
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          if (password.length < 8) return setInvalid("The password must be at least 8 characters.");
-          if (password !== confirm) return setInvalid("The two passwords do not match.");
+          if (password.length < 8) return setInvalid(t("The password must be at least 8 characters."));
+          if (password !== confirm) return setInvalid(t("The two passwords do not match."));
           setInvalid(null);
           save.mutate();
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="reset-password">New password</Label>
+            <Label htmlFor="reset-password">{t("New password")}</Label>
             <Input
               id="reset-password"
               type="password"
@@ -399,7 +413,7 @@ function PasswordSheet({
             />
           </div>
           <div>
-            <Label htmlFor="reset-confirm">Type it again</Label>
+            <Label htmlFor="reset-confirm">{t("Type it again")}</Label>
             <Input
               id="reset-confirm"
               type="password"
@@ -413,10 +427,10 @@ function PasswordSheet({
         {save.error ? <ErrorNote message={save.error.message} /> : null}
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="lg" disabled={save.isPending}>
-            {save.isPending ? "Saving…" : "Set password"}
+            {save.isPending ? t("Saving…") : t("Set password")}
           </Button>
           <Button type="button" size="lg" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </form>

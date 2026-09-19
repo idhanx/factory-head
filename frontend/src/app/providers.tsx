@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { setUpdateReady } from "@/lib/offline/status";
+import { LanguageProvider } from "@/lib/i18n";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -34,7 +35,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => registerServiceWorker(), []);
 
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <LanguageProvider>{children}</LanguageProvider>
+    </QueryClientProvider>
+  );
 }
 
 /**

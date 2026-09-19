@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, ErrorNote, Skeleton } from "@/components/ui/misc";
 import type { DowntimePercent, Productivity, Role } from "@/types/api";
+import { useT } from "@/lib/i18n";
+import { activeLocale } from "@/lib/format";
 
 /**
  * KPIs (§8) — one executive page, a drill-down per role.
@@ -63,17 +65,18 @@ export default function KpisPage() {
 }
 
 function Kpis() {
+  const t = useT();
   const session = loadSession();
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const roles = session?.roles ?? [];
   const money = seesMoney(roles);
-  const tabs = TABS.filter((t) => t.key !== "executive" || money);
+  const tabs = TABS.filter((item) => item.key !== "executive" || money);
   const requested = params.get("tab") as Tab | null;
-  const tab = requested && tabs.some((t) => t.key === requested) ? requested : defaultTab(roles);
+  const tab = requested && tabs.some((item) => item.key === requested) ? requested : defaultTab(roles);
   const [days, setDays] = useState(7);
-  const active = tabs.find((t) => t.key === tab) ?? tabs[0];
+  const active = tabs.find((item) => item.key === tab) ?? tabs[0];
 
   return (
     <div className="space-y-6">
@@ -81,10 +84,10 @@ function Kpis() {
         <div>
           <p className="label mb-1.5 flex items-center gap-1.5">
             <BarChart3 className="size-3" />
-            §8 · Role KPIs
+            {t("§8 · Role KPIs")}
           </p>
-          <h1 className="display text-[1.75rem] font-bold">KPIs</h1>
-          <p className="text-2 mt-1 max-w-2xl text-sm leading-relaxed">{active.why}</p>
+          <h1 className="display text-[1.75rem] font-bold">{t("KPIs")}</h1>
+          <p className="text-2 mt-1 max-w-2xl text-sm leading-relaxed">{t(active.why)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {money ? (
@@ -93,7 +96,7 @@ function Kpis() {
               className="text-2 flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors hover:surface-2 hover:text-[var(--text)]"
             >
               <FileText className="size-4" />
-              Monthly report
+              {t("Monthly report")}
             </Link>
           ) : null}
           <div className="surface-2 flex gap-0.5 rounded-xl border p-1">
@@ -108,7 +111,7 @@ function Kpis() {
                   days === d ? "surface text-[var(--text)] shadow-[var(--shadow-1)]" : "text-2 hover:text-[var(--text)]",
                 )}
               >
-                {d} days
+                {t("{0} days", { 0: d })}
               </button>
             ))}
           </div>
@@ -116,19 +119,19 @@ function Kpis() {
       </header>
 
       <div className="surface-2 flex w-fit max-w-full gap-0.5 overflow-x-auto rounded-xl border p-1" role="tablist">
-        {tabs.map((t) => (
+        {tabs.map((item) => (
           <button
-            key={t.key}
+            key={item.key}
             type="button"
             role="tab"
-            aria-selected={tab === t.key}
-            onClick={() => router.replace(`${pathname}?tab=${t.key}`, { scroll: false })}
+            aria-selected={tab === item.key}
+            onClick={() => router.replace(`${pathname}?tab=${item.key}`, { scroll: false })}
             className={cn(
               "rounded-lg px-3.5 py-1.5 text-[0.8125rem] font-medium whitespace-nowrap transition-colors",
-              tab === t.key ? "brand font-semibold" : "text-2 hover:text-[var(--text)]",
+              tab === item.key ? "brand font-semibold" : "text-2 hover:text-[var(--text)]",
             )}
           >
-            {t.label}
+            {t(item.label)}
           </button>
         ))}
       </div>
@@ -144,35 +147,39 @@ function Kpis() {
 // ===========================================================================
 
 function Executive({ days }: { days: number }) {
+  const t = useT();
   const q = useQuery({ queryKey: ["kpis", "executive", days], queryFn: () => api.roleKpis("executive", days) });
   if (q.isLoading) return <Skeleton className="h-80" />;
-  if (q.error) return <ErrorNote message={`Could not load these KPIs: ${q.error.message}`} />;
-  if (!q.data) return <Empty title="No data" />;
+  if (q.error) return <ErrorNote message={t("Could not load these KPIs: {0}", { 0: q.error.message })} />;
+  if (!q.data) return <Empty title={t("No data")} />;
   const d = q.data;
   const recoveredDelta = d.recovered_this_month_paise - d.recovered_last_month_paise;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Tile label={`Recoverable loss, ${days} days`}>
+        <Tile label={t("Recoverable loss, {0} days", { 0: days })}>
           <Money value={d.recoverable_loss_display} tone="loss" size="lg" />
         </Tile>
-        <Tile label="Recoverable loss, this month">
+        <Tile label={t("Recoverable loss, this month")}>
           <Money value={d.month_recoverable_loss_display} tone="loss" size="lg" />
         </Tile>
-        <Tile label="Recovered, this month vs last">
+        <Tile label={t("Recovered, this month vs last")}>
           <Money value={d.recovered_this_month_display} tone="recovered" size="lg" />
           <p className="text-3 mt-1 text-xs">
-            last month {d.recovered_last_month_display}
+            {t("last month")}{" "}{d.recovered_last_month_display}
             {d.recovered_last_month_paise ? (
               <Delta good={recoveredDelta >= 0} text={`${recoveredDelta >= 0 ? "+" : ""}${Math.round((recoveredDelta / d.recovered_last_month_paise) * 100)}%`} />
             ) : null}
           </p>
         </Tile>
-        <Tile label="Quality PPM">
+        <Tile label={t("Quality PPM")}>
           <span className="figure text-2xl font-bold">{Math.round(d.ppm).toLocaleString("en-IN")}</span>
           <p className="text-3 mt-1 text-xs">
-            previous {days} days {Math.round(d.previous_ppm).toLocaleString("en-IN")}
+            {t("previous {0} days {1}", {
+              0: days,
+              1: Math.round(d.previous_ppm).toLocaleString("en-IN"),
+            })}
             {/* Lower is better for PPM, so a fall is the good direction. */}
             {d.previous_ppm ? <Delta good={d.ppm <= d.previous_ppm} text={`${d.ppm <= d.previous_ppm ? "" : "+"}${Math.round(((d.ppm - d.previous_ppm) / d.previous_ppm) * 100)}%`} /> : null}
           </p>
@@ -183,14 +190,17 @@ function Executive({ days }: { days: number }) {
 
       <Card className="rise">
         <CardHeader>
-          <CardTitle>Top 5 recoverable losses, {days} days</CardTitle>
+          <CardTitle>{t("Top 5 recoverable losses, {0} days", { 0: days })}</CardTitle>
         </CardHeader>
         <CardContent>
           <Bars
             unit="₹"
             items={d.top_losses.map((l) => ({
               label: l.reason,
-              sub: `${l.station} · ${l.event_count} stop${l.event_count === 1 ? "" : "s"}`,
+              sub:
+                l.event_count === 1
+                  ? t("{0} · {1} stop", { 0: l.station, 1: l.event_count })
+                  : t("{0} · {1} stops", { 0: l.station, 1: l.event_count }),
               value: l.cost,
               display: l.cost_display,
             }))}
@@ -202,34 +212,35 @@ function Executive({ days }: { days: number }) {
 }
 
 function Supervisor({ days }: { days: number }) {
+  const t = useT();
   const q = useQuery({ queryKey: ["kpis", "supervisor", days], queryFn: () => api.roleKpis("supervisor", days) });
   if (q.isLoading) return <Skeleton className="h-96" />;
-  if (q.error) return <ErrorNote message={`Could not load these KPIs: ${q.error.message}`} />;
-  if (!q.data) return <Empty title="No data" />;
+  if (q.error) return <ErrorNote message={t("Could not load these KPIs: {0}", { 0: q.error.message })} />;
+  if (!q.data) return <Empty title={t("No data")} />;
   const d = q.data;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Tile label={`Plant OEE · ${d.shifts} shifts`}>
+        <Tile label={t("Plant OEE · {0} shifts", { 0: d.shifts })}>
           <span className="figure text-2xl font-bold">{pct(d.plant.oee)}</span>
           <p className="text-3 mt-1 text-xs">
-            A {pct(d.plant.availability)} × P {pct(d.plant.performance)} × Q {pct(d.plant.quality)}
+            {t("A {0} × P {1} × Q {2}", { 0: pct(d.plant.availability), 1: pct(d.plant.performance), 2: pct(d.plant.quality) })}
           </p>
         </Tile>
-        <Tile label="Produced">
+        <Tile label={t("Produced")}>
           <span className="figure text-2xl font-bold">{d.plant.produced.toLocaleString("en-IN")}</span>
-          <p className="text-3 mt-1 text-xs">parts, all lines</p>
+          <p className="text-3 mt-1 text-xs">{t("parts, all lines")}</p>
         </Tile>
-        <Tile label="Open actions">
+        <Tile label={t("Open actions")}>
           <span className="figure text-2xl font-bold">{d.open_actions}</span>
-          <p className="mt-1 text-xs text-[var(--color-loss)]">{d.overdue_actions} overdue</p>
+          <p className="mt-1 text-xs text-[var(--color-loss)]">{t("{0} overdue", { 0: d.overdue_actions })}</p>
         </Tile>
-        <Tile label="Downtime">
+        <Tile label={t("Downtime")}>
           <span className="figure text-2xl font-bold">
             {Math.round(d.downtime_by_reason.reduce((s, r) => s + r.minutes, 0)).toLocaleString("en-IN")}
           </span>
-          <p className="text-3 mt-1 text-xs">station-minutes</p>
+          <p className="text-3 mt-1 text-xs">{t("station-minutes")}</p>
         </Tile>
       </div>
       <ProductivityTiles productivity={d.productivity} downtime={d.downtime_percent} />
@@ -238,7 +249,7 @@ function Supervisor({ days }: { days: number }) {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="rise">
           <CardHeader>
-            <CardTitle>OEE per line</CardTitle>
+            <CardTitle>{t("OEE per line")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -246,7 +257,7 @@ function Supervisor({ days }: { days: number }) {
                 <thead>
                   <tr className="border-b">
                     {["Line", "OEE", "A", "P", "Q", "Made", "Target", "vs target"].map((h) => (
-                      <th key={h} className="label py-2 pr-3 text-left whitespace-nowrap">{h}</th>
+                      <th key={h} className="label py-2 pr-3 text-left whitespace-nowrap">{t(h)}</th>
                     ))}
                   </tr>
                 </thead>
@@ -271,11 +282,11 @@ function Supervisor({ days }: { days: number }) {
 
         <Card className="rise">
           <CardHeader>
-            <CardTitle>Plant OEE by day</CardTitle>
+            <CardTitle>{t("Plant OEE by day")}</CardTitle>
           </CardHeader>
           <CardContent>
             <Trend
-              data={d.trend.map((t) => ({ date: t.date, value: t.oee }))}
+              data={d.trend.map((item) => ({ date: item.date, value: item.oee }))}
               format={(v) => pct(v)}
               domain={[0, 1]}
               label="OEE"
@@ -286,17 +297,20 @@ function Supervisor({ days }: { days: number }) {
 
       <Card className="rise">
         <CardHeader>
-          <CardTitle>Downtime minutes by reason</CardTitle>
+          <CardTitle>{t("Downtime minutes by reason")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Bars
             unit="min"
             items={d.downtime_by_reason.slice(0, 10).map((r) => ({
               label: r.reason,
-              sub: `${r.events} stop${r.events === 1 ? "" : "s"} · ${r.cost_display}`,
+              sub:
+                r.events === 1
+                  ? t("{0} stop · {1}", { 0: r.events, 1: r.cost_display })
+                  : t("{0} stops · {1}", { 0: r.events, 1: r.cost_display }),
               value: r.minutes,
               display: `${Math.round(r.minutes)} min`,
-              badge: r.recoverability === "S" ? "Structural" : undefined,
+              badge: r.recoverability === "S" ? t("Structural") : undefined,
             }))}
           />
         </CardContent>
@@ -306,10 +320,11 @@ function Supervisor({ days }: { days: number }) {
 }
 
 function Quality({ days }: { days: number }) {
+  const t = useT();
   const q = useQuery({ queryKey: ["kpis", "quality", days], queryFn: () => api.roleKpis("quality", days) });
   if (q.isLoading) return <Skeleton className="h-96" />;
-  if (q.error) return <ErrorNote message={`Could not load these KPIs: ${q.error.message}`} />;
-  if (!q.data) return <Empty title="No data" />;
+  if (q.error) return <ErrorNote message={t("Could not load these KPIs: {0}", { 0: q.error.message })} />;
+  if (!q.data) return <Empty title={t("No data")} />;
   const d = q.data;
 
   return (
@@ -318,19 +333,19 @@ function Quality({ days }: { days: number }) {
         <Tile label="PPM">
           <span className="figure text-2xl font-bold">{Math.round(d.ppm).toLocaleString("en-IN")}</span>
           <p className="text-3 mt-1 text-xs">
-            previous {Math.round(d.previous_ppm).toLocaleString("en-IN")}
+            {t("previous {0}", { 0: Math.round(d.previous_ppm).toLocaleString("en-IN") })}
             {d.previous_ppm ? <Delta good={d.ppm <= d.previous_ppm} text={`${d.ppm <= d.previous_ppm ? "" : "+"}${Math.round(((d.ppm - d.previous_ppm) / d.previous_ppm) * 100)}%`} /> : null}
           </p>
         </Tile>
-        <Tile label="First-pass yield">
+        <Tile label={t("First-pass yield")}>
           <span className="figure text-2xl font-bold">{pct(d.first_pass_yield, 1)}</span>
-          <p className="text-3 mt-1 text-xs">rework does not count as first-pass</p>
+          <p className="text-3 mt-1 text-xs">{t("rework does not count as first-pass")}</p>
         </Tile>
-        <Tile label="Inspected">
+        <Tile label={t("Inspected")}>
           <span className="figure text-2xl font-bold">{d.inspected.toLocaleString("en-IN")}</span>
-          <p className="mt-1 text-xs text-[var(--color-loss)]">{d.rejected.toLocaleString("en-IN")} rejected</p>
+          <p className="mt-1 text-xs text-[var(--color-loss)]">{t("{0} rejected", { 0: d.rejected.toLocaleString("en-IN") })}</p>
         </Tile>
-        <Tile label="Scrap cost">
+        <Tile label={t("Scrap cost")}>
           <Money value={d.scrap_cost_display} tone="loss" size="lg" />
         </Tile>
       </div>
@@ -338,11 +353,11 @@ function Quality({ days }: { days: number }) {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="rise">
           <CardHeader>
-            <CardTitle>Top 3 defects — and whether they are rising</CardTitle>
+            <CardTitle>{t("Top 3 defects — and whether they are rising")}</CardTitle>
           </CardHeader>
           <CardContent>
             {d.top_defects.length === 0 ? (
-              <p className="text-3 py-6 text-center text-sm">No defects recorded.</p>
+              <p className="text-3 py-6 text-center text-sm">{t("No defects recorded.")}</p>
             ) : (
               <ul className="divide-y">
                 {d.top_defects.map((defect) => {
@@ -351,13 +366,15 @@ function Quality({ days }: { days: number }) {
                     <li key={defect.code} className="flex items-center justify-between gap-3 py-3">
                       <span>
                         <span className="block font-semibold">{defect.label}</span>
-                        <span className="text-3 text-xs">{defect.count} parts</span>
+                        <span className="text-3 text-xs">{t("{0} parts", { 0: defect.count })}</span>
                       </span>
                       <span className="text-right">
-                        <span className="tnum block font-bold">{Math.round(defect.ppm).toLocaleString("en-IN")} PPM</span>
+                        <span className="tnum block font-bold">{t("{0} PPM", { 0: Math.round(defect.ppm).toLocaleString("en-IN") })}</span>
                         <span className={cn("flex items-center justify-end gap-0.5 text-xs font-semibold", rising ? "text-[var(--color-loss)]" : "text-[var(--color-running)]")}>
                           {rising ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}
-                          {rising ? "rising" : "falling"} from {Math.round(defect.previous_ppm).toLocaleString("en-IN")}
+                          {rising
+                            ? t("rising from {0}", { 0: Math.round(defect.previous_ppm).toLocaleString("en-IN") })
+                            : t("falling from {0}", { 0: Math.round(defect.previous_ppm).toLocaleString("en-IN") })}
                         </span>
                       </span>
                     </li>
@@ -370,11 +387,11 @@ function Quality({ days }: { days: number }) {
 
         <Card className="rise">
           <CardHeader>
-            <CardTitle>PPM by day</CardTitle>
+            <CardTitle>{t("PPM by day")}</CardTitle>
           </CardHeader>
           <CardContent>
             <Trend
-              data={d.trend.map((t) => ({ date: t.date, value: t.ppm }))}
+              data={d.trend.map((item) => ({ date: item.date, value: item.ppm }))}
               format={(v) => Math.round(v).toLocaleString("en-IN")}
               label="PPM"
             />
@@ -384,16 +401,19 @@ function Quality({ days }: { days: number }) {
 
       <Card className="rise">
         <CardHeader>
-          <CardTitle>Rejects by machine</CardTitle>
+          <CardTitle>{t("Rejects by machine")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Bars
             unit="parts"
             items={d.by_machine.slice(0, 10).map((m) => ({
               label: m.station,
-              sub: `${Math.round(m.ppm).toLocaleString("en-IN")} PPM · scrap ${m.scrap_cost_display}`,
+              sub: t("{0} PPM · scrap {1}", {
+                0: Math.round(m.ppm).toLocaleString("en-IN"),
+                1: m.scrap_cost_display,
+              }),
               value: m.rejected,
-              display: `${m.rejected} rejected`,
+              display: t("{0} rejected", { 0: m.rejected }),
             }))}
           />
         </CardContent>
@@ -403,32 +423,33 @@ function Quality({ days }: { days: number }) {
 }
 
 function Maintenance({ days }: { days: number }) {
+  const t = useT();
   const q = useQuery({ queryKey: ["kpis", "maintenance", days], queryFn: () => api.roleKpis("maintenance", days) });
   if (q.isLoading) return <Skeleton className="h-96" />;
-  if (q.error) return <ErrorNote message={`Could not load these KPIs: ${q.error.message}`} />;
-  if (!q.data) return <Empty title="No data" />;
+  if (q.error) return <ErrorNote message={t("Could not load these KPIs: {0}", { 0: q.error.message })} />;
+  if (!q.data) return <Empty title={t("No data")} />;
   const d = q.data;
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Tile label={`Breakdowns, ${days} days`}>
+        <Tile label={t("Breakdowns, {0} days", { 0: days })}>
           <span className="figure text-2xl font-bold">{d.breakdowns}</span>
-          <p className="text-3 mt-1 text-xs">stops whose reason is flagged as a breakdown</p>
+          <p className="text-3 mt-1 text-xs">{t("stops whose reason is flagged as a breakdown")}</p>
         </Tile>
         <Tile label="MTBF">
           <span className="figure text-2xl font-bold">{duration(d.mtbf_minutes)}</span>
-          <p className="text-3 mt-1 text-xs">run time between breakdowns</p>
+          <p className="text-3 mt-1 text-xs">{t("run time between breakdowns")}</p>
         </Tile>
         <Tile label="MTTR">
           <span className="figure text-2xl font-bold">{duration(d.mttr_minutes)}</span>
-          <p className="text-3 mt-1 text-xs">average time to repair</p>
+          <p className="text-3 mt-1 text-xs">{t("average time to repair")}</p>
         </Tile>
       </div>
 
       <Card className="rise">
         <CardHeader>
-          <CardTitle>Machines, ranked by what breakdowns cost</CardTitle>
+          <CardTitle>{t("Machines, ranked by what breakdowns cost")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -436,7 +457,7 @@ function Maintenance({ days }: { days: number }) {
               <thead>
                 <tr className="border-b">
                   {["Machine", "Breakdowns", "Down", "Cost", "MTBF", "MTTR", "Availability"].map((h) => (
-                    <th key={h} className="label py-2 pr-4 text-left whitespace-nowrap">{h}</th>
+                    <th key={h} className="label py-2 pr-4 text-left whitespace-nowrap">{t(h)}</th>
                   ))}
                 </tr>
               </thead>
@@ -445,10 +466,10 @@ function Maintenance({ days }: { days: number }) {
                   <tr key={m.station} className="border-b last:border-0">
                     <td className="py-2.5 pr-4 whitespace-nowrap">
                       <span className="font-semibold">{m.station}</span>
-                      {m.is_bottleneck ? <Badge variant="stopped" className="ml-2">Bottleneck</Badge> : null}
+                      {m.is_bottleneck ? <Badge variant="stopped" className="ml-2">{t("Bottleneck")}</Badge> : null}
                     </td>
                     <td className="tnum py-2.5 pr-4 font-bold">{m.breakdowns}</td>
-                    <td className="tnum text-2 py-2.5 pr-4">{m.breakdowns ? `${Math.round(m.breakdown_minutes)} min` : "—"}</td>
+                    <td className="tnum text-2 py-2.5 pr-4">{m.breakdowns ? t("{0} min", { 0: Math.round(m.breakdown_minutes) }) : "—"}</td>
                     <td className="py-2.5 pr-4">{m.breakdowns ? <Money value={m.breakdown_cost_display} tone="loss" size="sm" /> : <span className="text-3">—</span>}</td>
                     <td className="tnum text-2 py-2.5 pr-4">{duration(m.mtbf_minutes)}</td>
                     <td className="tnum text-2 py-2.5 pr-4">{duration(m.mttr_minutes)}</td>
@@ -459,7 +480,7 @@ function Maintenance({ days }: { days: number }) {
             </table>
           </div>
           <p className="text-3 mt-3 text-xs">
-            &ldquo;—&rdquo; means no breakdowns in the period — not a time of zero.
+            {t("“—” means no breakdowns in the period — not a time of zero.")}
           </p>
         </CardContent>
       </Card>
@@ -490,6 +511,7 @@ function ProductivityTiles({
   productivity?: Productivity;
   downtime?: DowntimePercent;
 }) {
+  const t = useT();
   // An API that predates these figures simply leaves the row out.
   if (!productivity && !downtime) return null;
   const rate = (value: number | null | undefined) =>
@@ -500,38 +522,38 @@ function ProductivityTiles({
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {productivity ? (
         <>
-          <Tile label="Good parts per man-hour">
+          <Tile label={t("Good parts per man-hour")}>
             <span className="figure text-2xl font-bold">{rate(productivity.per_man_hour)}</span>
             <p className="text-3 mt-1 text-xs">
               {productivity.per_man_hour === null
-                ? "no man-hours booked in this period"
-                : `${productivity.good_parts.toLocaleString("en-IN")} good parts · ${hours(productivity.man_hours)} man-hours`}
+                ? t("no man-hours booked in this period")
+                : t("{0} good parts · {1} man-hours", { 0: productivity.good_parts.toLocaleString("en-IN"), 1: hours(productivity.man_hours) })}
             </p>
           </Tile>
-          <Tile label="Good parts per machine-hour">
+          <Tile label={t("Good parts per machine-hour")}>
             <span className="figure text-2xl font-bold">{rate(productivity.per_machine_hour)}</span>
             <p className="text-3 mt-1 text-xs">
               {productivity.per_machine_hour === null
-                ? "no machine run time in this period"
-                : `${hours(productivity.machine_hours)} machine-hours`}
+                ? t("no machine run time in this period")
+                : t("{0} machine-hours", { 0: hours(productivity.machine_hours) })}
             </p>
           </Tile>
         </>
       ) : null}
       {downtime ? (
-        <Tile label="Downtime, share of planned time">
+        <Tile label={t("Downtime, share of planned time")}>
           <span className="figure text-2xl font-bold">{pct(downtime.total, 1)}</span>
           <div
             className="surface-inset mt-2 flex h-2 overflow-hidden rounded-full"
             role="img"
-            aria-label={`Recoverable ${pct(downtime.recoverable, 1)}, structural ${pct(downtime.structural, 1)}`}
+            aria-label={t("Recoverable {0}, structural {1}", { 0: pct(downtime.recoverable, 1), 1: pct(downtime.structural, 1) })}
           >
             <div style={{ width: `${Math.min(100, downtime.recoverable * 100)}%`, background: "var(--color-loss)" }} />
             <div style={{ width: `${Math.min(100, downtime.structural * 100)}%`, background: "var(--color-structural)" }} />
           </div>
           <p className="mt-1.5 text-xs">
-            <span className="font-semibold text-[var(--color-loss)]">{pct(downtime.recoverable, 1)} recoverable</span>
-            <span className="text-3"> · {pct(downtime.structural, 1)} structural</span>
+            <span className="font-semibold text-[var(--color-loss)]">{t("{0} recoverable", { 0: pct(downtime.recoverable, 1) })}</span>
+            <span className="text-3"> {t("· {0} structural", { 0: pct(downtime.structural, 1) })}</span>
           </p>
         </Tile>
       ) : null}
@@ -555,10 +577,11 @@ function Bars({
   items: Array<{ label: string; sub?: string; value: number; display: string; badge?: string }>;
   unit: string;
 }) {
-  if (items.length === 0) return <p className="text-3 py-6 text-center text-sm">Nothing recorded.</p>;
+  const t = useT();
+  if (items.length === 0) return <p className="text-3 py-6 text-center text-sm">{t("Nothing recorded.")}</p>;
   const max = Math.max(...items.map((i) => i.value), 1);
   return (
-    <ol className="space-y-2.5" aria-label={`Ranked by ${unit}`}>
+    <ol className="space-y-2.5" aria-label={t("Ranked by {0}", { 0: unit })}>
       {items.map((item, index) => (
         <li key={`${item.label}-${index}`}>
           <div className="mb-1 flex items-baseline justify-between gap-3">
@@ -591,8 +614,9 @@ function Trend({
   label: string;
   domain?: [number, number];
 }) {
-  if (data.length === 0) return <p className="text-3 py-10 text-center text-sm">No closed shifts in this period.</p>;
-  const day = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const t = useT();
+  if (data.length === 0) return <p className="text-3 py-10 text-center text-sm">{t("No closed shifts in this period.")}</p>;
+  const day = (iso: string) => new Date(iso).toLocaleDateString(activeLocale(), { day: "numeric", month: "short" });
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -4 }}>

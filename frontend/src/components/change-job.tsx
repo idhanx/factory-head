@@ -14,6 +14,7 @@ import { ErrorNote, Skeleton } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import { JOB_STATUS_LABEL, NewJobOrderSheet, isAssignable } from "@/components/job-orders";
 import type { JobOrder } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * §14.3 — the mid-shift part change, from the tile.
@@ -33,6 +34,7 @@ export function ChangeJobSheet({
   onClose: () => void;
   onDone: (message: string) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const online = useSync((s) => s.online);
   const [jobId, setJobId] = useState("");
@@ -70,11 +72,11 @@ export function ChangeJobSheet({
 
   return (
     <Sheet
-      title={`Change job on ${tile.code}`}
+      title={t("Change job on {0}", { 0: tile.code })}
       subtitle={
         tile.job_number
-          ? `Now running #${tile.job_number}${tile.part_number ? ` · ${tile.part_number}` : ""}. Its counts stay with it.`
-          : "Nothing is assigned to this machine yet."
+          ? t("Now running #{0}{1}. Its counts stay with it.", { 0: tile.job_number, 1: tile.part_number ? ` · ${tile.part_number}` : "" })
+          : t("Nothing is assigned to this machine yet.")
       }
       onClose={onClose}
     >
@@ -86,12 +88,12 @@ export function ChangeJobSheet({
         }}
       >
         <fieldset>
-          <legend className="sr-only">Next job</legend>
+          <legend className="sr-only">{t("Next job")}</legend>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span aria-hidden className="text-sm font-medium">Next job</span>
+            <span aria-hidden className="text-sm font-medium">{t("Next job")}</span>
             <Button type="button" size="lg" variant="outline" onClick={() => setCreating(true)}>
               <Plus className="size-4" />
-              New job order
+              {t("New job order")}
             </Button>
           </div>
 
@@ -99,17 +101,17 @@ export function ChangeJobSheet({
             <Skeleton className="h-32" />
           ) : jobs.error ? (
             <div className="space-y-2">
-              <ErrorNote message={`Could not load job orders: ${jobs.error.message}`} />
+              <ErrorNote message={t("Could not load job orders: {0}", { 0: jobs.error.message })} />
               <Button type="button" size="lg" variant="outline" onClick={() => void jobs.refetch()}>
-                Try again
+                {t("Try again")}
               </Button>
             </div>
           ) : runnable.length === 0 ? (
             <p className="text-3 rounded-xl border border-dashed px-3 py-6 text-center text-sm">
-              No open job orders. Tap <strong>New job order</strong> to add one.
+              {t("No open job orders. Tap")}{" "}<strong>{t("New job order")}</strong> {t("to add one.")}
             </p>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Job orders">
+            <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t("Job orders")}>
               {runnable.map((job: JobOrder) => {
                 const current = job.job_number === tile.job_number;
                 const selected = job.id === jobId;
@@ -130,7 +132,7 @@ export function ChangeJobSheet({
                   >
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold">#{job.job_number}</span>
-                      {current ? <Badge variant="neutral">On this machine</Badge> : null}
+                      {current ? <Badge variant="neutral">{t("On this machine")}</Badge> : null}
                       {!current && job.status !== "planned" ? (
                         <Badge variant="neutral">{JOB_STATUS_LABEL[job.status] ?? job.status}</Badge>
                       ) : null}
@@ -146,9 +148,9 @@ export function ChangeJobSheet({
         </fieldset>
 
         <div className="max-w-sm">
-          <Label htmlFor="change-job-operator">Operator (optional)</Label>
+          <Label htmlFor="change-job-operator">{t("Operator (optional)")}</Label>
           {operators.error ? (
-            <ErrorNote message={`Could not load operators: ${operators.error.message}`} />
+            <ErrorNote message={t("Could not load operators: {0}", { 0: operators.error.message })} />
           ) : (
             <Select
               id="change-job-operator"
@@ -156,7 +158,7 @@ export function ChangeJobSheet({
               disabled={operators.isLoading}
               onChange={(e) => setOperatorId(e.target.value)}
             >
-              <option value="">{operators.isLoading ? "Loading…" : "Same as before"}</option>
+              <option value="">{operators.isLoading ? t("Loading…") : t("Same as before")}</option>
               {activeOperators.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.name}
@@ -170,18 +172,17 @@ export function ChangeJobSheet({
         {!online ? (
           <p role="status" className="flex items-center gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-[var(--color-warn)]">
             <WifiOff className="size-4 shrink-0" />
-            Needs a connection. Changing a job cannot be saved on the tablet for later — the counts
-            in between would land on the wrong job.
+            {t("Needs a connection. Changing a job cannot be saved on the tablet for later — the counts in between would land on the wrong job.")}
           </p>
         ) : null}
         {change.error ? <ErrorNote message={change.error.message} /> : null}
 
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="touch" disabled={!jobId || !online || change.isPending}>
-            {change.isPending ? "Changing…" : "Change job"}
+            {change.isPending ? t("Changing…") : t("Change job")}
           </Button>
           <Button type="button" size="touch" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </form>

@@ -13,6 +13,36 @@
 
 const RUPEE = 100;
 
+/**
+ * The locale and translator the formatters are currently running under.
+ *
+ * These helpers are plain functions called from ~100 places, many of them
+ * outside a component, so threading the language through every signature would
+ * be a worse cure than the disease. `LanguageProvider` sets both while it
+ * renders, before any child reads them, and the whole tree re-renders when the
+ * language changes — so a formatter never returns text from the old language.
+ *
+ * Digit grouping deliberately stays Indian in all three languages: ₹12,34,567
+ * is what the register and the paper reconcile against, and Tamil or Hindi
+ * script does not change how a lakh is punctuated.
+ */
+let dateLocale = "en-IN";
+let translateUnit: (source: string, vars?: Record<string, string | number>) => string = (source) =>
+  source;
+
+export function setFormatLanguage(
+  locale: string,
+  translator: (source: string, vars?: Record<string, string | number>) => string,
+): void {
+  dateLocale = locale;
+  translateUnit = translator;
+}
+
+/** The locale screens should pass to their own `toLocaleDateString` calls. */
+export function activeLocale(): string {
+  return dateLocale;
+}
+
 /** Indian digit grouping: 1234567 -> "12,34,567". */
 function groupIndian(value: number): string {
   const s = Math.trunc(Math.abs(value)).toString();
@@ -48,10 +78,12 @@ function trim(value: number): string {
 }
 
 export function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${Math.round(minutes)} min`;
+  if (minutes < 60) return translateUnit("{0} min", { 0: Math.round(minutes) });
   const hours = Math.floor(minutes / 60);
   const rest = Math.round(minutes % 60);
-  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+  return rest
+    ? translateUnit("{0}h {1}m", { 0: hours, 1: rest })
+    : translateUnit("{0}h", { 0: hours });
 }
 
 export function formatPercent(ratio: number, digits = 0): string {
@@ -60,7 +92,7 @@ export function formatPercent(ratio: number, digits = 0): string {
 
 export function formatClock(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString("en-IN", {
+  return new Date(iso).toLocaleTimeString(dateLocale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -69,7 +101,7 @@ export function formatClock(iso: string | null | undefined): string {
 
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", {
+  return new Date(iso).toLocaleDateString(dateLocale, {
     day: "numeric",
     month: "short",
   });

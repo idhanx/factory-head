@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Empty, Skeleton } from "@/components/ui/misc";
+import { useT } from "@/lib/i18n";
 
 /**
  * Factory Memory (Layer 4).
@@ -22,6 +23,7 @@ import { Empty, Skeleton } from "@/components/ui/misc";
  * plant's two years of data to match it.
  */
 export default function Memory() {
+  const t = useT();
   const [query, setQuery] = useState("");
   const entries = useQuery({
     queryKey: ["memory", query],
@@ -35,11 +37,11 @@ export default function Memory() {
       <header className="rise">
         <p className="label mb-1.5 flex items-center gap-1.5">
           <BookOpen className="size-3" />
-          Layer 4
+          {t("Layer 4")}
         </p>
-        <h1 className="display text-[1.75rem] font-bold">Factory Memory</h1>
+        <h1 className="display text-[1.75rem] font-bold">{t("Factory Memory")}</h1>
         <p className="text-2 mt-1 text-sm">
-          Every fix this plant has recorded. Have we seen this before?
+          {t("Every fix this plant has recorded. Have we seen this before?")}
         </p>
       </header>
 
@@ -48,8 +50,8 @@ export default function Memory() {
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="rust, insert, coolant, staging…"
-          aria-label="Search Factory Memory"
+          placeholder={t("rust, insert, coolant, staging…")}
+          aria-label={t("Search Factory Memory")}
           className="elev-2 h-13 pl-10 text-[0.9375rem]"
         />
         {results.length ? (
@@ -68,8 +70,8 @@ export default function Memory() {
       ) : results.length === 0 ? (
         <Empty
           icon={<BookOpen className="size-6" />}
-          title={query ? "Nothing recorded like that" : "Memory is still filling"}
-          hint="Entries are captured automatically when someone closes an action — four questions, sixty seconds. Memory with three weeks of history is thin; with two years it is the plant's deepest asset."
+          title={query ? t("Nothing recorded like that") : t("Memory is still filling")}
+          hint={t("Entries are captured automatically when someone closes an action — four questions, sixty seconds. Memory with three weeks of history is thin; with two years it is the plant's deepest asset.")}
         />
       ) : (
         <div className="space-y-3">
@@ -81,7 +83,7 @@ export default function Memory() {
             >
               <CardContent className="pt-5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="font-semibold">{entry.problem_summary ?? "Recorded fix"}</p>
+                  <p className="font-semibold">{entry.problem_summary ?? t("Recorded fix")}</p>
                   <div className="flex items-center gap-2">
                     {entry.station_code ? (
                       <Badge variant="neutral">{entry.station_code}</Badge>
@@ -94,13 +96,13 @@ export default function Memory() {
                   <div className="flex gap-2.5">
                     <Wrench className="text-3 mt-0.5 size-3.5 shrink-0" />
                     <div>
-                      <dt className="label mb-0.5">What fixed it</dt>
+                      <dt className="label mb-0.5">{t("What fixed it")}</dt>
                       <dd className="leading-relaxed">{entry.what_fixed_it}</dd>
                     </div>
                   </div>
                   {entry.what_was_replaced ? (
                     <div className="pl-6">
-                      <dt className="label mb-0.5">Replaced or changed</dt>
+                      <dt className="label mb-0.5">{t("Replaced or changed")}</dt>
                       <dd className="text-2 leading-relaxed">{entry.what_was_replaced}</dd>
                     </div>
                   ) : null}
@@ -109,7 +111,7 @@ export default function Memory() {
                       <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-[var(--color-warn)]" />
                       <div>
                         <dt className="label mb-0.5 text-[var(--color-warn)]">
-                          Check this first next time
+                          {t("Check this first next time")}
                         </dt>
                         <dd className="font-medium leading-relaxed">
                           {entry.check_first_next_time}
@@ -120,7 +122,7 @@ export default function Memory() {
                 </dl>
 
                 {entry.fixed_by_name ? (
-                  <p className="text-3 mt-3.5 text-xs">Recorded by {entry.fixed_by_name}</p>
+                  <p className="text-3 mt-3.5 text-xs">{t("Recorded by {0}", { 0: entry.fixed_by_name })}</p>
                 ) : null}
               </CardContent>
             </Card>

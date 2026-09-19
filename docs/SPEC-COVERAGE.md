@@ -7,6 +7,57 @@ Legend: ✅ built · 🟡 partial · ❌ not built · ⛔ deliberately out of sc
 
 ---
 
+## Section 1 — Who uses it
+
+§1's "Who uses it" table is a contract, not a cast list: it names six roles and
+gives each one duties and a cadence. Audited row by row, and the two rows that
+had nothing behind them are now built (`tests/test_role_desks.py`).
+
+| Role | §1 duty | Cadence | Where it lives |
+|---|---|---|---|
+| **Plant Owner / MD** | Daily loss report, monthly trends, approves overrides | daily, 2 min | `/owner`, `/kpis/monthly`, override on shift close |
+| **Shift Supervisor** | Starts the shift, hourly counts, downtime with reasons, closes the shift | through each shift | `/shift`, `/floor` |
+| **Quality Inspector** | Good parts and rejections with defect codes | 2–4×/shift | `/quality` — its own login, so §2's cross-check means something |
+| **Maintenance In-charge** | Receives escalation alerts · **logs what was done to fix breakdowns** | when events occur | `/maintenance` ✅ **new** |
+| **Stores In-charge** | Receives material-shortage alerts · **confirms material staging** | when events occur | `/stores` ✅ **new** |
+| **Onboarding consultant** | Cost parameters, machine list, reason codes; trains the team | once + reviews | `/onboarding`, `/settings` |
+
+### What was missing, and why it mattered
+
+Maintenance and Stores both landed on `/actions` — the PDCA backlog, which
+answers a different question from the one either role opens an app to ask. The
+three defects behind that:
+
+1. **Escalations carried a name but not a route.** §3 Layer 2 says *"the system
+   picks the recipient from the reason code"*, and the ladder did exactly that —
+   then stored only the person. So `GET /escalations` handed the whole plant's
+   ladder to everyone, and the routing decision was lost the day the recipient
+   list changed. `escalations.route` now records it; the backfill separated the
+   demo plant's existing rungs into 1,160 maintenance and 509 stores.
+2. **Nowhere to log a repair.** `POST /downtime/{id}/close` took no note, so
+   §1's second maintenance duty had no home and §3 Layer 4's *"what usually
+   fixes this?"* had nothing per-event to draw on.
+3. **Stores had no screen at all.** §6's 5:45 AM briefing asks Stores to confirm
+   material is at the line before 8:00; there was no way to answer.
+
+### Two rules these modules are built against
+
+**The route decides whose stop it is — never `is_breakdown`.** §8.1 reserves
+that flag for MTBF/MTTR (*"'Machine Breakdown' code only"*) and the default
+library sets it on one of eighteen codes, while **six** route to maintenance.
+Filtering the desk on it would have hidden five of the six — including the tool
+breakage §6's own Priority 1 assigns to Suresh K. in Maintenance. Caught by a
+test, not in a pilot.
+
+**Neither desk adds a daily register.** §4.3's 15-minute budget is sacred and
+§3 applies it to every surface, plugins included. The staging queue is today's
+job orders; no row exists until somebody answers, so a plant that ignores the
+screen is left exactly as it was. A repair note is testimony beside the record —
+it never touches cost, duration, reason code or times, which is what keeps §2's
+"the data locks permanently" true.
+
+---
+
 ## Section 3 — The six layers
 
 | Layer | Scope | Status |
@@ -27,12 +78,55 @@ Each one adds no daily data entry — the rule §3 sets for every plugin.
 | Plugin | What it does | Feeds |
 |---|---|---|
 | **Compliance / Audit AI** | Live readiness across ISO 9001, IATF 16949 and ZED, scored from Core data; every clause opens onto the exact records that scored it; cross-standard mapping; frozen evidence packs | — |
-| **Kaizen AI** | Ideas priced against this plant's own losses and answered on submission, with the reasoning shown; accept → a real Action with a frozen baseline; decline requires a reason | Actions, Recovered Profit |
+| **Kaizen AI** | The full Plugin Edition — see the section below | Actions, Recovered Profit, Factory Memory, Skill Matrix, Compliance |
 | **Skill Matrix AI** | Operator × station matrix; training needs from 'No Operator' stops (measured ₹/yr) and single-person stations (₹ per idle shift, from the kernel) | Actions |
 
-Bugs caught while building the demo data, each now pinned by a test:
+### Kaizen AI — Plugin Edition v2
+
+Built against *Kaizen AI — Plugin Edition v2*, which is the Standalone Edition
+with §2's deltas applied. What §2.1 **removed** matters as much as what was
+added, and none of it may creep back:
+
+| Removed from standalone | Because | What replaces it |
+|---|---|---|
+| Plant Cost Master (Groups A and B) | Core's T4 holds every rate | Read Core. Zero Kaizen cost-setup screens |
+| The manual bottleneck list | Core carries a Bottleneck Factor per machine | Read BF; the question leaves the interview |
+| Kaizen's own savings formulas | Two implementations of one formula produce two numbers | Core's formula module, called once |
+| Kaizen's PDCA object and status chips | Core's Actions engine is the PDCA cycle | An approved Kaizen creates a Core Action |
+| Kaizen's 2-week verification rule | Two rules for one metric means the total depends on who you ask | Core's Recovered Profit ledger, unchanged |
+| A separate Friday digest | A second weekly blast trains people to ignore both | A block inside Core's weekly owner digest |
+| Onboarding templates K1–K3 | People, stations and cost data arrive via Core's T1–T7 | Only K4 and K5 remain — about ten minutes |
+
+What the plugin adds that no standalone product can:
+
+| Step | Feature |
+|---|---|
+| 1 | Voice-first capture, transcribed on the device; the model tidies and may never introduce a number nobody said |
+| 2 | Vision AI under three hard rules — operator consent, "possible" never "confirmed", five finding categories only |
+| 3–4 | Category confirmed in one tap; 4–6 questions, minus everything Core already knows |
+| **5A** | **The Core History Check** — what this problem has already cost, on events Core recorded, in three tiers, with its rank among the plant's recurring losses, its trend, duplicate-Action and recurrence detection |
+| 6 | Core's formula module prices it; Kaizen's classification layer splits hard / soft / stars and never merges them |
+| 7 | One cheaper alternative, never two, ending in a question — AI advises, never blocks |
+| 8 | The Business Impact Card, with the ticking cost of doing nothing |
+| 9 | Implementation forecast from Core's own Action and closure history, available from the first Kaizen |
+| 10 | Approval templates A/B/C plus threshold rules; above Core's threshold it becomes a Core Action |
+| 12–13 | Operator-facing progress driven by the Action's status, with a message on every transition |
+| §9 | Verification through Core's Recovered Profit — dual attribution, the rupee counted once |
+| §10 | Pattern detection across Kaizen submissions **and** Core events; one plant-wide Action, not seventeen |
+| §11 | Priority scoring weighted towards Core-verified cost over projected savings; weights are configuration |
+
+AI runs on a **local Ollama** (`OLLAMA_*` in `backend/.env`) so photos and voice
+never leave the plant, and every path has a deterministic fallback — nothing in
+the operator journey blocks on a model being up. The money is never
+model-generated.
+
+Bugs caught while building, each now pinned by a test:
+- **`PdcaState` exists in both the kernel and the models**, so `action.state is PdcaState.VERIFIED` silently never matched and no Kaizen ever reached Verified. A `str` enum's `==` *does* match, which is what made it so quiet;
+- a real local model answered the vision prompt with a bare JSON **array** instead of the object it was asked for, crashing the parser mid-journey;
+- the same model **copied the worked example** out of the challenge prompt verbatim, so every Kaizen came back with "move the toolbox to the midpoint";
+- "the insert breaks" classified as a *cost* Kaizen, which has no reason code to match against, so the History Check found nothing;
 - an idea about a fan "near the inspection bench" priced as the plant's most valuable idea (keyword on a place, not a problem);
-- keyword substrings — "oil" matching "soil";
+- keyword substrings — "oil" matching "soil", "tool" matching both "stool" and "toolbox";
 - an idea naming "CNC-3" in its text priced plant-wide;
 - single-operator risk reported as a station's *entire* downtime ×1.5 (₹1.6 lakh/yr for CNC-3) instead of the cost of one idle shift (₹10,921);
 - a compliance clause scored as a gap while listing 25 rows of evidence.
@@ -46,7 +140,7 @@ Bugs caught while building the demo data, each now pinned by a test:
 | Job orders spanning shifts, days and machines | ✅ |
 | Lots, three granularities (day-batch → shift-batch → job lot) | ✅ |
 | Routing operations in the data model from day one | ✅ |
-| Change Job event (§14.3) | ✅ API · ❌ UI |
+| Change Job event (§14.3) | ✅ API · ✅ UI (`components/change-job.tsx`, from the machine grid) |
 | **Stage completion capture** (Op10 → Op20 → Op30 → Op40) | ✅ one tap per stage, from the in-progress board |
 | **WIP visibility** — "500 through machining, 430 through assembly, 70 in WIP" | ✅ `app/kernel/flow.py`, in-progress board |
 | **Dispatch reconciliation** — despatched vs produced | ✅ flagged once despatch is recorded |
@@ -109,9 +203,11 @@ Profit with the baseline freeze and two-week sustain rule. ✅
 
 Plus the two non-screen deliverables: escalation ladder ✅, AI Shift Coach ✅.
 
-**❌ Offline capability.** §7 and §16.3 both require it: *"Everything must work
+**✅ Offline capability.** §7 and §16.3 both require it: *"Everything must work
 offline on the tablet and sync when internet returns — Tamil Nadu plant Wi-Fi
-cannot be trusted."* Not built.
+cannot be trusted."* Built — `lib/offline/` (IndexedDB outbox, idempotent
+`client_ref` per entry, `POST /sync/batch`, and a held-entry queue an owner
+resolves in Settings).
 
 ---
 
@@ -137,7 +233,7 @@ Q 99.1%). The endpoint that served it also returned a 500; fixed.
 ## Section 9 — Build order
 
 Stage 1 ✅ · Stage 2 ✅ · Stage 3 🟡 (Copilot pattern tier ✅, WhatsApp ❌)
-Parallel plugin stream ❌.
+Parallel plugin stream ✅ (all three plugins built — see Layer 5 above).
 
 The NOT-building list was respected in full: no hardware or firmware, no
 benchmarking, no ERP/Tally integration, no ABC costing, no material-batch
@@ -164,18 +260,27 @@ traceability, no Tamil voice, no consultant portal.
 3. ~~**Traceability query**~~ ✅ done.
 4. ~~**Role KPI pages**~~ ✅ done.
 5. ~~**Monthly owner report**~~ ✅ done.
+6. ~~**Offline capture and sync**~~ ✅ done.
+7. ~~**Change Job UI**~~ ✅ done.
+8. ~~**The Maintenance and Stores desks**~~ ✅ done — §1's last two unserved roles.
 
-Still open, deliberately:
+### Still open
 
-- **Offline capture and sync** (§7, §16.3) — needs a client-side store and a
-  conflict policy; §16.4 says to decide those rules before the first pilot, so
-  it is a work stream of its own rather than a patch.
-- **WhatsApp delivery (WATI)** — blocked on a 3–5 week external approval.
-- **Change Job UI** (§14.3) — the API exists; the screen does not.
-- **Demo targets** — the seed's T7 targets (200 parts/shift) sit far below what
-  its machines produce, so line schedule adherence shows 135–177%. A data issue,
-  not a code one.
+| Item | Why it is still open |
+|---|---|
+| **WhatsApp delivery (WATI)** | §16.4 — blocked on a 3–5 week external approval. The escalation ladder and Copilot both run today over push and in-app; the transport is already abstracted (`app/delivery/transports.py`), so WATI is a provider swap, not a build. |
+| **Layer 6 — Industry Benchmark** | ⛔ by §3's own rule: it needs 40–50 live plants. *"Nothing is built for it now."* |
+| **Tamil voice, ERP/Tally, ABC costing, material-batch traceability, consultant portal, hardware** | ⛔ on §9's NOT-building list, which *"is as binding as the feature list"*. |
 
-Originally deferred with reason: offline sync (needs a client-side store and a conflict
-policy — a work stream of its own, §16.4 says decide the rules before the first
-pilot), and WATI (blocked on a 3–5 week external approval).
+### Known demo-data issues (data, not code)
+
+- The seed's T7 targets (200 parts/shift) sit far below what its machines
+  produce, so line schedule adherence shows 135–177%.
+- The demo plant tags `TOOL_CHANGE` "Tool Change (planned)" as
+  Recoverable/unplanned while the default library (§16.4) ships it as
+  Structural/planned. The label and the attributes disagree; the attributes are
+  what every formula reads, so the desks and KPIs treat it as recoverable
+  maintenance work. Worth settling against a real plant's own tagging.
+- Three stops in the demo plant ran for 1,900–6,200 minutes across several days
+  before being closed. Real enough as data, but they dominate any cost ranking
+  they appear in.

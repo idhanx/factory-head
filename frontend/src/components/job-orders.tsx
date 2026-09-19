@@ -8,6 +8,7 @@ import { Input, Label, Select } from "@/components/ui/input";
 import { ErrorNote } from "@/components/ui/misc";
 import { Sheet } from "@/components/ui/sheet";
 import type { JobOrder } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * Creating today's jobs, from the Shift Start screen or Settings.
@@ -49,6 +50,7 @@ export function NewJobOrderSheet({
   onClose: () => void;
   onCreated?: (job: JobOrder) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const parts = useQuery({ queryKey: ["parts"], queryFn: api.parts });
   const [partId, setPartId] = useState("");
@@ -75,22 +77,22 @@ export function NewJobOrderSheet({
   const activeParts = (parts.data ?? []).filter((p) => p.is_active !== false);
 
   return (
-    <Sheet title="New job order" subtitle="Which part, and how many." onClose={onClose}>
+    <Sheet title={t("New job order")} subtitle={t("Which part, and how many.")} onClose={onClose}>
       <form
         className="space-y-4"
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (!partId) return setInvalid("Pick the part this job makes.");
-          if (!positiveInt(quantity)) return setInvalid("Planned quantity must be a whole number above 0.");
+          if (!partId) return setInvalid(t("Pick the part this job makes."));
+          if (!positiveInt(quantity)) return setInvalid(t("Planned quantity must be a whole number above 0."));
           setInvalid(null);
           create.mutate();
         }}
       >
         <div>
-          <Label htmlFor="job-part">Part</Label>
+          <Label htmlFor="job-part">{t("Part")}</Label>
           {parts.error ? (
-            <ErrorNote message={`Could not load parts: ${parts.error.message}`} />
+            <ErrorNote message={t("Could not load parts: {0}", { 0: parts.error.message })} />
           ) : (
             <Select
               id="job-part"
@@ -99,7 +101,7 @@ export function NewJobOrderSheet({
               disabled={parts.isLoading}
               autoFocus
             >
-              <option value="">{parts.isLoading ? "Loading parts…" : "Select a part…"}</option>
+              <option value="">{parts.isLoading ? t("Loading parts…") : t("Select a part…")}</option>
               {activeParts.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.part_number}
@@ -113,7 +115,7 @@ export function NewJobOrderSheet({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="job-qty">Planned quantity</Label>
+            <Label htmlFor="job-qty">{t("Planned quantity")}</Label>
             <Input
               id="job-qty"
               inputMode="numeric"
@@ -124,18 +126,18 @@ export function NewJobOrderSheet({
             />
           </div>
           <div>
-            <Label htmlFor="job-due">Due date (optional)</Label>
+            <Label htmlFor="job-due">{t("Due date (optional)")}</Label>
             <Input id="job-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
         </div>
 
         <div>
-          <Label htmlFor="job-number">Job number (optional)</Label>
+          <Label htmlFor="job-number">{t("Job number (optional)")}</Label>
           <Input
             id="job-number"
             value={jobNumber}
             onChange={(e) => setJobNumber(e.target.value)}
-            placeholder="Leave blank to number it automatically"
+            placeholder={t("Leave blank to number it automatically")}
           />
         </div>
 
@@ -144,10 +146,10 @@ export function NewJobOrderSheet({
 
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="touch" disabled={create.isPending}>
-            {create.isPending ? "Creating…" : "Create job"}
+            {create.isPending ? t("Creating…") : t("Create job")}
           </Button>
           <Button type="button" size="touch" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </form>
@@ -165,6 +167,7 @@ export function RepeatJobOrderSheet({
   onClose: () => void;
   onCreated?: (job: JobOrder) => void;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [quantity, setQuantity] = useState(String(job.planned_quantity));
   const [dueDate, setDueDate] = useState("");
@@ -185,8 +188,8 @@ export function RepeatJobOrderSheet({
 
   return (
     <Sheet
-      title={`Repeat #${job.job_number}`}
-      subtitle={`${job.part_number ?? "Same part"}${job.customer_name ? ` · ${job.customer_name}` : ""} — gets a new job number.`}
+      title={t("Repeat #{0}", { 0: job.job_number })}
+      subtitle={t("{0}{1} — gets a new job number.", { 0: job.part_number ?? "Same part", 1: job.customer_name ? ` · ${job.customer_name}` : "" })}
       onClose={onClose}
     >
       <form
@@ -194,14 +197,14 @@ export function RepeatJobOrderSheet({
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          if (!positiveInt(quantity)) return setInvalid("Planned quantity must be a whole number above 0.");
+          if (!positiveInt(quantity)) return setInvalid(t("Planned quantity must be a whole number above 0."));
           setInvalid(null);
           repeat.mutate();
         }}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="repeat-qty">Planned quantity</Label>
+            <Label htmlFor="repeat-qty">{t("Planned quantity")}</Label>
             <Input
               id="repeat-qty"
               inputMode="numeric"
@@ -212,7 +215,7 @@ export function RepeatJobOrderSheet({
             />
           </div>
           <div>
-            <Label htmlFor="repeat-due">Due date (optional)</Label>
+            <Label htmlFor="repeat-due">{t("Due date (optional)")}</Label>
             <Input id="repeat-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
         </div>
@@ -222,10 +225,10 @@ export function RepeatJobOrderSheet({
 
         <div className="flex flex-wrap gap-2">
           <Button type="submit" size="touch" disabled={repeat.isPending}>
-            {repeat.isPending ? "Creating…" : "Create repeat job"}
+            {repeat.isPending ? t("Creating…") : t("Create repeat job")}
           </Button>
           <Button type="button" size="touch" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("Cancel")}
           </Button>
         </div>
       </form>

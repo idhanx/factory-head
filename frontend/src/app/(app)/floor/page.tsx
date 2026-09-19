@@ -19,6 +19,7 @@ import { Sheet } from "@/components/ui/sheet";
 import { StationTileCard } from "@/components/station-tile";
 import { ChangeJobSheet } from "@/components/change-job";
 import type { ReasonCode, StationTile } from "@/types/api";
+import { useT } from "@/lib/i18n";
 
 /**
  * Screens 2, 3 and 4 on one surface.
@@ -34,6 +35,7 @@ import type { ReasonCode, StationTile } from "@/types/api";
  * server. Changing a job is the one action here that needs the network.
  */
 export default function Floor() {
+  const t = useT();
   const queryClient = useQueryClient();
   const session = loadSession();
   const canChangeJob = session ? can(session.roles, "supervisor", "owner") : false;
@@ -79,7 +81,7 @@ export default function Floor() {
       after?.();
       return true;
     } catch (e) {
-      setError(`Could not save this on the tablet: ${(e as Error).message}`);
+      setError(t("Could not save this on the tablet: {0}", { 0: (e as Error).message }));
       return false;
     }
   };
@@ -110,7 +112,7 @@ export default function Floor() {
   const start = async (tile: LocalTile, reason?: ReasonCode): Promise<boolean> => {
     const target = closeTarget(tile, ops, openStarts);
     if (!target) {
-      setError(`${tile.code}: this stop has not reached the tablet yet. Refresh the page, then try again.`);
+      setError(t("{0}: this stop has not reached the tablet yet. Refresh the page, then try again.", { 0: tile.code }));
       return false;
     }
     if (!tile.reason_label && !reason) {
@@ -156,13 +158,13 @@ export default function Floor() {
   const rejectedHere = ops.filter((op) => op.status === "rejected" && op.kind !== "quality");
 
   const totals = useMemo(() => {
-    const stoppedTiles = tiles.filter((t) => t.status === "stopped");
+    const stoppedTiles = tiles.filter((tile) => tile.status === "stopped");
     return {
       stopped: stoppedTiles.length,
-      running: tiles.filter((t) => t.status === "running").length,
-      idle: tiles.filter((t) => t.status === "idle").length,
-      liveLoss: stoppedTiles.reduce((sum, t) => sum + t.live_cost_paise, 0),
-      shiftLoss: tiles.reduce((sum, t) => sum + t.shift_cost_paise, 0),
+      running: tiles.filter((tile) => tile.status === "running").length,
+      idle: tiles.filter((tile) => tile.status === "idle").length,
+      liveLoss: stoppedTiles.reduce((sum, tile) => sum + tile.live_cost_paise, 0),
+      shiftLoss: tiles.reduce((sum, tile) => sum + tile.shift_cost_paise, 0),
     };
   }, [tiles]);
 
@@ -181,11 +183,11 @@ export default function Floor() {
     return (
       <Empty
         icon={<PlayCircle className="size-6" />}
-        title="No shift is open"
-        hint="Start the shift to begin recording. Under a minute — pick the shift, confirm what each line is running, tap Start."
+        title={t("No shift is open")}
+        hint={t("Start the shift to begin recording. Under a minute — pick the shift, confirm what each line is running, tap Start.")}
         action={
           <Button asChild className="mt-2">
-            <a href="/shift">Start shift</a>
+            <a href="/shift">{t("Start shift")}</a>
           </Button>
         }
       />
@@ -197,17 +199,17 @@ export default function Floor() {
       {/* ---- shift banner ------------------------------------------------ */}
       <header className="rise surface elev-2 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-[var(--radius-card)] border p-5">
         <div>
-          <p className="label mb-1.5">Shopfloor</p>
-          <h1 className="display text-[1.75rem] font-bold">Machine grid</h1>
+          <p className="label mb-1.5">{t("Shopfloor")}</p>
+          <h1 className="display text-[1.75rem] font-bold">{t("Machine grid")}</h1>
           <div className="text-2 mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1.5">
-              <StatusLed state="running" /> {totals.running} running
+              <StatusLed state="running" /> {t("{0} running", { 0: totals.running })}
             </span>
             <span className="flex items-center gap-1.5">
-              <StatusLed state="stopped" /> {totals.stopped} stopped
+              <StatusLed state="stopped" /> {t("{0} stopped", { 0: totals.stopped })}
             </span>
             <span className="flex items-center gap-1.5">
-              <StatusLed state="idle" /> {totals.idle} idle
+              <StatusLed state="idle" /> {t("{0} idle", { 0: totals.idle })}
             </span>
           </div>
         </div>
@@ -217,13 +219,13 @@ export default function Floor() {
             <div>
               <p className="label mb-1 flex items-center gap-1.5 text-[var(--color-loss)]">
                 <AlertTriangle className="size-3" />
-                Stopped right now
+                {t("Stopped right now")}
               </p>
               <Money value={formatInr(totals.liveLoss)} tone="loss" size="xl" live />
             </div>
           ) : null}
           <div>
-            <p className="label mb-1">Lost this shift</p>
+            <p className="label mb-1">{t("Lost this shift")}</p>
             <Money value={formatInr(totals.shiftLoss)} tone="loss" size="xl" />
           </div>
         </div>
@@ -234,22 +236,20 @@ export default function Floor() {
         <p role="status" className="surface-2 rise flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2 text-sm">
           <span>{notice}</span>
           <Button size="sm" variant="ghost" className="h-11" onClick={() => setNotice(null)}>
-            Dismiss
+            {t("Dismiss")}
           </Button>
         </p>
       ) : null}
       {shift.error && !shift.data ? (
-        <ErrorNote message={`Could not check the open shift (${shift.error.message}). Entries are still kept on this tablet.`} />
+        <ErrorNote message={t("Could not check the open shift ({0}). Entries are still kept on this tablet.", { 0: shift.error.message })} />
       ) : null}
       {rejectedHere.length ? (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[color-mix(in_oklab,var(--color-stopped)_35%,transparent)] bg-[var(--color-stopped-dim)] px-4 py-2 text-sm text-[var(--color-loss)]">
           <span>
-            {rejectedHere.length} entr{rejectedHere.length === 1 ? "y was" : "ies were"} not accepted by the
-            server. {rejectedHere[0].meta.station_code ? `${rejectedHere[0].meta.station_code}: ` : ""}
-            {rejectedHere[0].message}
+            {t("{0} entr{1} not accepted by the server. {2}{3}", { 0: rejectedHere.length, 1: rejectedHere.length === 1 ? "y was" : "ies were", 2: rejectedHere[0].meta.station_code ? `${rejectedHere[0].meta.station_code}: ` : "", 3: rejectedHere[0].message })}
           </span>
           <Button size="sm" variant="outline" className="h-11" onClick={() => openSyncSheet(true)}>
-            See entries
+            {t("See entries")}
           </Button>
         </div>
       ) : null}
@@ -262,15 +262,15 @@ export default function Floor() {
         </div>
       ) : grid.error && !grid.data ? (
         <div className="space-y-3">
-          <ErrorNote message={`Could not load the machine grid: ${grid.error.message}`} />
+          <ErrorNote message={t("Could not load the machine grid: {0}", { 0: grid.error.message })} />
           <Button size="lg" variant="outline" onClick={() => void grid.refetch()}>
-            Try again
+            {t("Try again")}
           </Button>
         </div>
       ) : tiles.length === 0 ? (
         <Empty
           title="No machines on the grid"
-          hint="Stations appear here once they are set up in Settings → Stations, or loaded from template T1."
+          hint={t("Stations appear here once they are set up in Settings → Stations, or loaded from template T1.")}
         />
       ) : (
         lines.map(([line, group], lineIndex) => (
@@ -279,7 +279,7 @@ export default function Floor() {
               <h2 className="label">{line}</h2>
               <span className="hairline flex-1" />
               <span className="text-3 tnum text-xs">
-                {group.reduce((s, t) => s + t.count, 0)} parts
+                {t("{0} parts", { 0: group.reduce((s, tile) => s + tile.count, 0) })}
               </span>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -288,17 +288,17 @@ export default function Floor() {
                   key={tile.station_id}
                   tile={tile}
                   index={lineIndex * 4 + i}
-                  onStop={(t) => {
+                  onStop={(tile) => {
                     setError(null);
-                    setStopping(t);
+                    setStopping(tile);
                   }}
-                  onStart={(t) => {
+                  onStart={(tile) => {
                     setError(null);
-                    void start(t);
+                    void start(tile);
                   }}
-                  onCount={(t) => {
+                  onCount={(tile) => {
                     setError(null);
-                    setCounting(t);
+                    setCounting(tile);
                   }}
                   onChangeJob={canChangeJob ? setChanging : undefined}
                 />
@@ -384,6 +384,7 @@ function ReasonSheet({
   onPick: (reason: ReasonCode, note: string) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -402,14 +403,14 @@ function ReasonSheet({
 
   return (
     <Sheet
-      title={mode === "stop" ? `${tile.code} stopped` : `${tile.code} — why did it stop?`}
-      subtitle={mode === "stop" ? "Why?" : "No reason was recorded. Pick one and the machine goes back to Running."}
+      title={mode === "stop" ? t("{0} stopped", { 0: tile.code }) : t("{0} — why did it stop?", { 0: tile.code })}
+      subtitle={mode === "stop" ? t("Why?") : t("No reason was recorded. Pick one and the machine goes back to Running.")}
       onClose={onClose}
     >
       {mode === "stop" ? (
         noteOpen ? (
           <div className="mb-4">
-            <Label htmlFor="stop-note">Note (optional)</Label>
+            <Label htmlFor="stop-note">{t("Note (optional)")}</Label>
             <Textarea
               id="stop-note"
               rows={2}
@@ -417,16 +418,16 @@ function ReasonSheet({
               value={note}
               autoFocus
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Coolant pump tripped twice before this"
+              placeholder={t("Coolant pump tripped twice before this")}
               aria-describedby="stop-note-hint"
             />
             <p id="stop-note-hint" className="text-3 mt-1 text-xs">
-              {note.length}/1000 · then tap the reason below.
+              {t("{0}/1000 · then tap the reason below.", { 0: note.length })}
             </p>
           </div>
         ) : (
           <Button type="button" size="sm" variant="outline" className="mb-4 h-11 px-4" onClick={() => setNoteOpen(true)}>
-            Add a note
+            {t("Add a note")}
           </Button>
         )
       ) : null}
@@ -437,7 +438,7 @@ function ReasonSheet({
         </div>
       ) : null}
       {reasonsError && reasons.length === 0 ? (
-        <ErrorNote message={`Could not load the reason list: ${reasonsError}`} />
+        <ErrorNote message={t("Could not load the reason list: {0}", { 0: reasonsError })} />
       ) : null}
 
       <div className="grid gap-2.5 sm:grid-cols-2">
@@ -452,7 +453,7 @@ function ReasonSheet({
             <span className="block text-[0.9375rem] font-semibold">{reason.label}</span>
             <span className="mt-1 flex flex-wrap items-center gap-1.5">
               <Badge variant={reason.recoverability === "R" ? "recoverable" : "structural"}>
-                {reason.recoverability === "R" ? "Recoverable" : "Structural"}
+                {reason.recoverability === "R" ? t("Recoverable") : t("Structural")}
               </Badge>
               {reason.escalation_route !== "none" ? (
                 <span className="text-3 text-[0.6875rem] capitalize">
@@ -467,7 +468,7 @@ function ReasonSheet({
       {rest.length ? (
         <details className="mt-4">
           <summary className="text-2 flex min-h-11 cursor-pointer items-center text-sm font-medium">
-            Other reasons ({rest.length})
+            {t("Other reasons ({0})", { 0: rest.length })}
           </summary>
           <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
             {rest.map((reason) => (
@@ -500,11 +501,12 @@ function CountSheet({
   onSubmit: (value: number) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const t = useT();
   const [value, setValue] = useState("");
   const [sent, setSent] = useState(false);
 
   return (
-    <Sheet title={tile.code} subtitle="Parts since your last entry" onClose={onClose}>
+    <Sheet title={tile.code} subtitle={t("Parts since your last entry")} onClose={onClose}>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -522,11 +524,11 @@ function CountSheet({
           value={value}
           onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))}
           placeholder="0"
-          aria-label="Parts produced since last entry"
+          aria-label={t("Parts produced since last entry")}
           className="money h-28 text-center text-6xl font-bold"
         />
         <p className="text-3 mt-2.5 text-center text-xs">
-          Not the running total — just what came off since you last looked.
+          {t("Not the running total — just what came off since you last looked.")}
         </p>
         {error ? (
           <div className="mt-3">
@@ -534,7 +536,7 @@ function CountSheet({
           </div>
         ) : null}
         <Button type="submit" size="touch" className="mt-4 w-full" disabled={sent || !value}>
-          {sent ? "Saving…" : "Save count"}
+          {sent ? t("Saving…") : t("Save count")}
         </Button>
       </form>
     </Sheet>

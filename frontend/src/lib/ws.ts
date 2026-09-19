@@ -34,13 +34,28 @@ const WS_BASE =
     ? `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`
     : "");
 
+/** Plant Wi-Fi drops: a supervisor should never look at a dead screen for long. */
+const LIVE_RETRY_CAP_MS = 15_000;
+/**
+ * A handshake that never opens is a different failure from a dropped one. The
+ * usual cause is a token the server will not accept — it lasts a shift, and a
+ * tablet left on the grid overnight outlives it. A browser cannot read the
+ * server's close code on a rejected handshake, so it reads like any other
+ * drop; retrying every fifteen seconds until someone picks the tablet up is
+ * pointless traffic. Back these off much further instead.
+ */
+const LIVE_REJECTED_CAP_MS = 5 * 60_000;
+
 export function useLiveChannel(onEvent: (event: LiveEvent) => void) {
   const handler = useRef(onEvent);
-  handler.current = onEvent;
+  // Assigned in an effect, not during render: a render React discards must not
+  // leave the channel calling a handler that was never committed.
+  useEffect(() => {
+    handler.current = onEvent;
+  });
 
   useEffect(() => {
-    const session = loadSession();
-    if (!session || !WS_BASE) return;
+    if (!WS_BASE) return;
 
     let socket: WebSocket | null = null;
     let keepalive: ReturnType<typeof setInterval> | null = null;
@@ -50,9 +65,17 @@ export function useLiveChannel(onEvent: (event: LiveEvent) => void) {
 
     const connect = () => {
       if (closed) return;
+      // Read the session on every attempt. Captured once, a reconnect would
+      // keep presenting a token the server has already refused, and a sign-out
+      // would leave the loop running against a session that no longer exists.
+      const session = loadSession();
+      if (!session) return;
+
+      let opened = false;
       socket = new WebSocket(`${WS_BASE}/ws/live?token=${session.access_token}`);
 
       socket.onopen = () => {
+        opened = true;
         attempt = 0;
         // Reading is how the server notices a tablet that walked out of range.
         keepalive = setInterval(() => socket?.send("ping"), 25_000);
@@ -69,11 +92,9 @@ export function useLiveChannel(onEvent: (event: LiveEvent) => void) {
       socket.onclose = () => {
         if (keepalive) clearInterval(keepalive);
         if (closed) return;
-        // Plant Wi-Fi drops. Back off, but cap it: a supervisor should never
-        // be looking at a dead screen for more than ~15 seconds.
         attempt += 1;
-        const delay = Math.min(15_000, 1000 * 2 ** Math.min(attempt, 4));
-        retry = setTimeout(connect, delay);
+        const cap = opened ? LIVE_RETRY_CAP_MS : LIVE_REJECTED_CAP_MS;
+        retry = setTimeout(connect, Math.min(cap, 1000 * 2 ** Math.min(attempt, 9)));
       };
     };
 

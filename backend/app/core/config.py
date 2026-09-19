@@ -74,6 +74,32 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 30.0
     llm_max_tokens: int = 700
 
+    # --- Ollama: local AI for the Kaizen plugin ------------------------------
+    # Ollama serves an OpenAI-compatible API at /v1, so one client speaks to it
+    # and to vLLM alike. Kaizen defaults to Ollama for a reason beyond cost: a
+    # photo of somebody's shop floor, and an operator's voice note describing
+    # what is wrong with it, never leave the plant's own machine. Any of these
+    # may point at the shared vLLM tier instead by setting the URL.
+    #
+    # Pull once on the plant server:
+    #   ollama pull qwen2.5:7b-instruct    # the interview, challenge, rewrite
+    #   ollama pull qwen2.5vl:7b           # Step 2 — reading the photo
+    #   ollama pull nomic-embed-text       # pattern-detection fingerprints
+    #
+    # Every path that uses these degrades to a deterministic fallback when
+    # Ollama is unreachable. Nothing in the operator journey blocks on a model.
+    ollama_enabled: bool = False
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = "qwen2.5:7b-instruct"
+    ollama_vision_model: str = "qwen2.5vl:7b"
+    ollama_embedding_model: str = "nomic-embed-text"
+    ollama_timeout_seconds: float = 60.0
+    # Vision is the most expensive call in the plugin and ~80% of volume is
+    # Quick Observations, so §13.4's cost question gets an explicit lever: a
+    # ceiling on how many photos a plant analyses per day, after which photos
+    # are still stored as evidence but not read.
+    vision_daily_limit: int = 400
+
     # --- WhatsApp (WATI) -----------------------------------------------------
     # §16.4: apply on day 1, approval takes 3-5 weeks. Until then the escalation
     # ladder runs with the console/SMS transport and loses nothing but reach.
