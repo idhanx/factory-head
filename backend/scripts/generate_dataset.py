@@ -38,6 +38,23 @@ from scripts.dataset.simulate import IST, Generator
 DEFAULT_OUT = Path(__file__).resolve().parents[2] / "datasets" / "factorymanager_dataset"
 
 
+def alembic_head() -> tuple[str, str]:
+    """The current migration head and its message, read from the migrations.
+
+    Hardcoding the revision is how the last one went stale: the dataset said
+    ``0ba4b6bb4343`` long after five more migrations had landed, so anyone
+    following the README loaded it into a schema it no longer matched.
+    """
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    root = Path(__file__).resolve().parents[1]
+    script = ScriptDirectory.from_config(Config(str(root / "alembic.ini")))
+    head = script.get_current_head()
+    revision = script.get_revision(head)
+    return head, (revision.doc or "").strip()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -58,6 +75,7 @@ def main() -> None:
     parser.add_argument("--formats", default="sql,csv,xlsx,forms")
     args = parser.parse_args()
 
+    head, head_note = alembic_head()
     formats = {f.strip() for f in args.formats.split(",") if f.strip()}
     now = datetime.combine(args.as_of, time.fromisoformat(args.now), tzinfo=IST)
     started = clock.perf_counter()
@@ -77,7 +95,7 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     manifest = {
         "product": "FactoryManager AI",
-        "schema_revision": "0ba4b6bb4343 (plugin tables: compliance, kaizen, skills)",
+        "schema_revision": f"{head} ({head_note})" if head_note else head,
         "seed": args.seed,
         "as_of": args.as_of.isoformat(),
         "data_stops_at": now.isoformat(),
@@ -102,7 +120,7 @@ def main() -> None:
     header = (
         "-- FactoryManager AI — full-product test dataset\n"
         f"-- {total:,} rows, {len(PLANTS)} plants, data up to {now.isoformat()}\n"
-        "-- Load into an EMPTY schema at Alembic head (0ba4b6bb4343):\n"
+        f"-- Load into an EMPTY schema at Alembic head ({head}):\n"
         "--   cd backend && alembic upgrade head\n"
         '--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f factorymanager_data.sql\n'
         "-- Money is integer paise. Timestamps are IST (+05:30).\n"
@@ -110,12 +128,15 @@ def main() -> None:
 
     if "sql" in formats:
         (out / "sql").mkdir(exist_ok=True)
-        export.write_sql(store, out / "sql" / "factorymanager_data.sql", header)
+        parts = export.write_sql(store, out / "sql" / "factorymanager_data.sql", header)
         export.write_reset_sql(store, out / "sql" / "00_reset_all_tables.sql")
-        print("  sql ............ done")
+        manifest["sql_parts"] = parts
+        print(f"  sql ............ done ({len(parts)} part files)")
     if "csv" in formats:
-        export.write_csv(store, out / "csv")
-        print("  csv ............ done")
+        files = export.write_csv(store, out / "csv")
+        manifest["csv_files"] = {k: v for k, v in files.items() if len(v) > 1}
+        split = sum(len(v) for v in files.values() if len(v) > 1)
+        print(f"  csv ............ done{f' ({split} part files for large tables)' if split else ''}")
     if "xlsx" in formats:
         (out / "excel").mkdir(exist_ok=True)
         summary = [

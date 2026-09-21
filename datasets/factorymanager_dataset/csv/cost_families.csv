@@ -1,23 +1,50 @@
 id,code,name,description,plant_id,created_at,updated_at
-25c10b56-81d4-4e1c-8f93-900dec73457e,CNC-family,CNC Turning,"5 CNC lathes, 8-10 years old",60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-05-25T10:30:00+05:30,2026-05-25T10:30:00+05:30
-7349b8c6-f5ed-401c-824b-3f3cb66e2f1e,VMC-family,Vertical Machining,VMCs and radial drills,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-05-25T10:30:00+05:30,2026-05-25T10:30:00+05:30
-f69715b5-4b34-40e9-8070-8727951d3470,PRESS-family,Presses up to 100T,Mechanical presses 40-100T,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-05-25T10:30:00+05:30,2026-05-25T10:30:00+05:30
-8147227f-b931-48f8-a8a2-75be8d5cc07d,ASSY-family,Assembly Stations,Assembly benches and welding booth,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-05-25T10:30:00+05:30,2026-05-25T10:30:00+05:30
-e77d4500-8d47-41fd-9c8b-e5a7ff998a7d,QC-family,Inspection Bench,Final inspection and dispatch desk,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-05-25T10:30:00+05:30,2026-05-25T10:30:00+05:30
-09024a81-0a0f-4676-a9ee-5ea3274dd482,PRESS-S,Mechanical Presses up to 80T,40T / 63T / 80T C-frame presses,60fcf375-6e93-41a7-bf8a-4a1e8c179723,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
-a64c59be-f1f2-4e79-b26a-7738483f881a,PRESS-L,Presses 150-250T,Straight-side presses with coil feeders,60fcf375-6e93-41a7-bf8a-4a1e8c179723,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
-75eb695a-2a28-4146-a5ee-b82012c63204,WELD,Spot / Projection Welding,Resistance welding,60fcf375-6e93-41a7-bf8a-4a1e8c179723,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
-f7a9e71b-f9a5-40f4-914e-a1c0d394c8f9,TAP,Tapping & Drilling,Secondary operations,60fcf375-6e93-41a7-bf8a-4a1e8c179723,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
-3a0521bb-6166-40e7-98ee-d2bc20608ef5,ASSY,Sub-assembly,Manual sub-assembly benches,60fcf375-6e93-41a7-bf8a-4a1e8c179723,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
-4e8901ce-e132-47ef-9be7-2b737fffdefc,QC,Inspection & Dispatch,Final inspection bench and dispatch bay,60fcf375-6e93-41a7-bf8a-4a1e8c179723,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
-16a2f75c-2c2b-4d0e-94bc-c0d083e699e0,CNC-T,CNC Turning Centres,LMW / Ace turning centres,1a816471-1518-4dbe-84d8-d9d5d6e536ec,2026-07-13T10:30:00+05:30,2026-07-13T10:30:00+05:30
-1adb5762-7e9c-49b5-8410-c27cff05b651,VMC,Vertical Machining Centres,3-axis VMCs,1a816471-1518-4dbe-84d8-d9d5d6e536ec,2026-07-13T10:30:00+05:30,2026-07-13T10:30:00+05:30
-26059d14-bc65-4cc2-af5b-c348c806afdb,HMC,Horizontal Machining Centre,4-axis HMC with pallet changer,1a816471-1518-4dbe-84d8-d9d5d6e536ec,2026-07-13T10:30:00+05:30,2026-07-13T10:30:00+05:30
-6b725c59-1892-497f-9a59-fb4aed2ae68b,GRIND,Cylindrical Grinding,Plain and centreless grinding,1a816471-1518-4dbe-84d8-d9d5d6e536ec,2026-07-13T10:30:00+05:30,2026-07-13T10:30:00+05:30
-485aa056-9696-4f36-8e2b-96ac207a383f,FIN,Deburr & Finishing,Manual deburr and wash,1a816471-1518-4dbe-84d8-d9d5d6e536ec,2026-07-13T10:30:00+05:30,2026-07-13T10:30:00+05:30
-2c6ecc6b-e2b0-4fa1-bbc3-2b5eada2f63b,QC,CMM & Inspection,CMM room and dispatch,1a816471-1518-4dbe-84d8-d9d5d6e536ec,2026-07-13T10:30:00+05:30,2026-07-13T10:30:00+05:30
-ae21e6e6-3a6a-453f-84ef-315b130353b1,HEAD,Cold Heading,Multi-station cold headers and nut formers,c655a5e3-a9cb-46e4-9889-ce172579f2eb,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
-5f476e15-743b-4537-b49f-d340def9324f,ROLL,Thread Rolling,Flat-die thread rollers,c655a5e3-a9cb-46e4-9889-ce172579f2eb,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
-8a830e05-f582-4098-b736-27e66b396893,FORGE,Hot Forging Press,400T forging press with induction heater,c655a5e3-a9cb-46e4-9889-ce172579f2eb,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
-dbc003fa-a146-457b-9dcb-e1106926cd3f,HT,Heat Treatment,Continuous mesh-belt hardening furnace,c655a5e3-a9cb-46e4-9889-ce172579f2eb,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
-6ff03962-e6b5-405e-97a1-e8b94c88f32b,SORT,Sorting & Dispatch,Optical sorter and packing,c655a5e3-a9cb-46e4-9889-ce172579f2eb,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
+25c10b56-81d4-4e1c-8f93-900dec73457e,CNC-family,CNC Turning,"5 CNC lathes, 8-10 years old",60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-02-09T10:30:00+05:30,2026-02-09T10:30:00+05:30
+7349b8c6-f5ed-401c-824b-3f3cb66e2f1e,VMC-family,Vertical Machining,VMCs and radial drills,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-02-09T10:30:00+05:30,2026-02-09T10:30:00+05:30
+f69715b5-4b34-40e9-8070-8727951d3470,PRESS-family,Presses up to 100T,Mechanical presses 40-100T,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-02-09T10:30:00+05:30,2026-02-09T10:30:00+05:30
+8147227f-b931-48f8-a8a2-75be8d5cc07d,ASSY-family,Assembly Stations,Assembly benches and welding booth,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-02-09T10:30:00+05:30,2026-02-09T10:30:00+05:30
+e77d4500-8d47-41fd-9c8b-e5a7ff998a7d,QC-family,Inspection Bench,Final inspection and dispatch desk,60272f0d-5f4c-4744-8df2-610dca1b74d5,2026-02-09T10:30:00+05:30,2026-02-09T10:30:00+05:30
+a1e8ae20-0072-44ac-a997-e8f07a537aa2,PRESS-S,Mechanical Presses up to 80T,40T / 63T / 80T C-frame presses,73b7959f-8e7c-4ba4-89b5-3f8b182ffe22,2026-03-09T10:30:00+05:30,2026-03-09T10:30:00+05:30
+1c4f13bd-867f-4c7d-a404-c6a9e46f3248,PRESS-L,Presses 150-250T,Straight-side presses with coil feeders,73b7959f-8e7c-4ba4-89b5-3f8b182ffe22,2026-03-09T10:30:00+05:30,2026-03-09T10:30:00+05:30
+114298c5-9461-4546-8239-141249b476a0,WELD,Spot / Projection Welding,Resistance welding,73b7959f-8e7c-4ba4-89b5-3f8b182ffe22,2026-03-09T10:30:00+05:30,2026-03-09T10:30:00+05:30
+2ecea6bd-bffe-460a-92f0-555ff319f35b,TAP,Tapping & Drilling,Secondary operations,73b7959f-8e7c-4ba4-89b5-3f8b182ffe22,2026-03-09T10:30:00+05:30,2026-03-09T10:30:00+05:30
+de9099e3-b8ca-477c-ada2-379d5979336f,ASSY,Sub-assembly,Manual sub-assembly benches,73b7959f-8e7c-4ba4-89b5-3f8b182ffe22,2026-03-09T10:30:00+05:30,2026-03-09T10:30:00+05:30
+e28d16ba-f83c-4804-aa2a-b38c7408a0fd,QC,Inspection & Dispatch,Final inspection bench and dispatch bay,73b7959f-8e7c-4ba4-89b5-3f8b182ffe22,2026-03-09T10:30:00+05:30,2026-03-09T10:30:00+05:30
+ee7b440f-81ca-492c-9c39-1c8151e27c42,CNC-T,CNC Turning Centres,LMW / Ace turning centres,de96db7b-8b6c-49ef-af31-dd56dc43f3f0,2026-04-13T10:30:00+05:30,2026-04-13T10:30:00+05:30
+c9dd65c3-e7d8-4472-b3de-1d76c0681003,VMC,Vertical Machining Centres,3-axis VMCs,de96db7b-8b6c-49ef-af31-dd56dc43f3f0,2026-04-13T10:30:00+05:30,2026-04-13T10:30:00+05:30
+7e7b5be4-b4d4-4231-905d-ce1aee2d98da,HMC,Horizontal Machining Centre,4-axis HMC with pallet changer,de96db7b-8b6c-49ef-af31-dd56dc43f3f0,2026-04-13T10:30:00+05:30,2026-04-13T10:30:00+05:30
+19b63fc8-e4a7-423a-b478-ec7e6c5f7001,GRIND,Cylindrical Grinding,Plain and centreless grinding,de96db7b-8b6c-49ef-af31-dd56dc43f3f0,2026-04-13T10:30:00+05:30,2026-04-13T10:30:00+05:30
+de3578cf-0b25-4042-b388-cb7c97733aef,FIN,Deburr & Finishing,Manual deburr and wash,de96db7b-8b6c-49ef-af31-dd56dc43f3f0,2026-04-13T10:30:00+05:30,2026-04-13T10:30:00+05:30
+5a5f16f8-99d0-4c92-a1c9-9fc926a5123e,QC,CMM & Inspection,CMM room and dispatch,de96db7b-8b6c-49ef-af31-dd56dc43f3f0,2026-04-13T10:30:00+05:30,2026-04-13T10:30:00+05:30
+5e8282d6-a226-475b-822e-b1ce9b678d74,HEAD,Cold Heading,Multi-station cold headers and nut formers,c1e39645-60be-460e-ad4c-8d9903d4c7fa,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
+5f86074f-4200-46a7-a897-7a232a57257e,ROLL,Thread Rolling,Flat-die thread rollers,c1e39645-60be-460e-ad4c-8d9903d4c7fa,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
+438b70bd-83e4-492f-ab6c-9e72eb87c23a,FORGE,Hot Forging Press,400T forging press with induction heater,c1e39645-60be-460e-ad4c-8d9903d4c7fa,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
+dcd5239d-bddc-4ad9-8bd1-33b7d30bb225,HT,Heat Treatment,Continuous mesh-belt hardening furnace,c1e39645-60be-460e-ad4c-8d9903d4c7fa,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
+93ec4253-8956-4171-aa3a-2d237d775459,SORT,Sorting & Dispatch,Optical sorter and packing,c1e39645-60be-460e-ad4c-8d9903d4c7fa,2026-08-17T10:30:00+05:30,2026-08-17T10:30:00+05:30
+e110f7e7-4908-4944-9b24-f3047fbdc2a0,FORGE-family,Forging Press,1000T and 630T presses with induction heaters,ee7622c7-4370-4558-b022-660005d0350f,2026-03-30T10:30:00+05:30,2026-03-30T10:30:00+05:30
+4b354908-b1f8-4857-972f-6c67500a03cc,HT-family,Heat Treatment,Sealed quench furnace and tempering line,ee7622c7-4370-4558-b022-660005d0350f,2026-03-30T10:30:00+05:30,2026-03-30T10:30:00+05:30
+70312724-47d1-4195-a26f-046d7a9f4aac,CNC-family,CNC Turning,8 CNC lathes on the finishing line,ee7622c7-4370-4558-b022-660005d0350f,2026-03-30T10:30:00+05:30,2026-03-30T10:30:00+05:30
+83d80ed8-fbae-488d-9637-2752f00ec94a,HMC-family,Horizontal Machining,HMC cells for flange faces,ee7622c7-4370-4558-b022-660005d0350f,2026-03-30T10:30:00+05:30,2026-03-30T10:30:00+05:30
+c16ba783-a1b6-4396-be35-eb2c7d155b8a,FIN-family,Deburr & Wash,Deburr benches and parts washer,ee7622c7-4370-4558-b022-660005d0350f,2026-03-30T10:30:00+05:30,2026-03-30T10:30:00+05:30
+b8b68147-6162-4a25-8c73-4a20fe9b114c,QC-family,Inspection & Dispatch,"CMM, hardness testers, dispatch bay",ee7622c7-4370-4558-b022-660005d0350f,2026-03-30T10:30:00+05:30,2026-03-30T10:30:00+05:30
+74a99909-cede-48c5-94ec-6665fee50b82,IM-LARGE,Injection Moulding 250-450T,Large tonnage moulding machines,64ce3ffc-5dc6-4843-8581-012700d2e05e,2026-05-11T10:30:00+05:30,2026-05-11T10:30:00+05:30
+28418280-a7e8-48b0-a67e-62eb6760b100,IM-SMALL,Injection Moulding 80-150T,Small tonnage moulding machines,64ce3ffc-5dc6-4843-8581-012700d2e05e,2026-05-11T10:30:00+05:30,2026-05-11T10:30:00+05:30
+51cdcde7-6d27-4930-852e-00bfa95e59cb,FIN-family,Finishing & Deflash,"Deflash, ultrasonic welding, pad printing",64ce3ffc-5dc6-4843-8581-012700d2e05e,2026-05-11T10:30:00+05:30,2026-05-11T10:30:00+05:30
+3427ee4f-cceb-4f8d-9536-5a032c73360a,ASSY-family,Sub-assembly,Manual assembly and packing benches,64ce3ffc-5dc6-4843-8581-012700d2e05e,2026-05-11T10:30:00+05:30,2026-05-11T10:30:00+05:30
+e7d96693-b3c2-4297-b525-ecf6e963c36d,QC-family,Inspection,Dimensional and functional inspection,64ce3ffc-5dc6-4843-8581-012700d2e05e,2026-05-11T10:30:00+05:30,2026-05-11T10:30:00+05:30
+d05885b3-cc82-4bcb-9a8c-a9ed85c663ae,VTL-family,Vertical Turret Lathe,VTLs for casing and cover faces,aaef419e-0cdf-4e9f-8e6c-ae204ba87206,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
+896f89a4-95db-4da1-9a9e-d788ea46b59f,CNC-family,CNC Turning,CNC lathes for impellers and shafts,aaef419e-0cdf-4e9f-8e6c-ae204ba87206,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
+d2559d47-d266-4e62-8721-136c13ff1aea,VMC-family,Vertical Machining,VMCs for mounting faces and ports,aaef419e-0cdf-4e9f-8e6c-ae204ba87206,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
+df0c5cff-f3fd-4497-bbfd-0120086770dc,TEST-family,Test & Balance,Hydro test rig and dynamic balancer,aaef419e-0cdf-4e9f-8e6c-ae204ba87206,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
+8488c99e-2020-406a-af13-7997dd3454d5,ASSY-family,Pump Assembly,Assembly and paint booth,aaef419e-0cdf-4e9f-8e6c-ae204ba87206,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
+0d496511-1513-477d-a7ba-c6e884866b8d,QC-family,Inspection & Dispatch,Final inspection and dispatch,aaef419e-0cdf-4e9f-8e6c-ae204ba87206,2026-06-08T10:30:00+05:30,2026-06-08T10:30:00+05:30
+f12197d4-3042-4530-9901-ce4f0687d378,LASER-family,Laser Cutting,3kW fibre laser,1fe6161e-beec-4fb6-a912-0666335e9e16,2026-07-06T10:30:00+05:30,2026-07-06T10:30:00+05:30
+4641158f-70fb-4915-9ea9-935aa90bff76,BEND-family,Press Brake,CNC press brakes,1fe6161e-beec-4fb6-a912-0666335e9e16,2026-07-06T10:30:00+05:30,2026-07-06T10:30:00+05:30
+62cd20f8-80fe-4eae-889b-4d67942d130b,WELD-family,Welding,MIG welding bays and spot welder,1fe6161e-beec-4fb6-a912-0666335e9e16,2026-07-06T10:30:00+05:30,2026-07-06T10:30:00+05:30
+3ab001c1-0c50-40a2-a332-d6ef9fe90138,POWDER-family,Powder Coating,Seven-tank pre-treatment and oven,1fe6161e-beec-4fb6-a912-0666335e9e16,2026-07-06T10:30:00+05:30,2026-07-06T10:30:00+05:30
+e2cc87cd-5b25-4751-baea-1d80bfdae816,QC-family,Inspection & Dispatch,Inspection table and dispatch,1fe6161e-beec-4fb6-a912-0666335e9e16,2026-07-06T10:30:00+05:30,2026-07-06T10:30:00+05:30
+6b76bd6a-bfec-49c3-b820-2d1dd0dadaf1,WIND-family,Armature Winding,Automatic armature winders,672ac686-a825-400c-902d-cee8392463da,2026-08-03T10:30:00+05:30,2026-08-03T10:30:00+05:30
+681ffc7d-7b7c-4251-893f-24929fb89c3f,PRESS-family,Stamping & Lamination,40T and 63T presses for laminations,672ac686-a825-400c-902d-cee8392463da,2026-08-03T10:30:00+05:30,2026-08-03T10:30:00+05:30
+5df39297-bd09-435e-8bae-9933809396a4,ASSY-family,Assembly Lines,Motor and starter assembly lines,672ac686-a825-400c-902d-cee8392463da,2026-08-03T10:30:00+05:30,2026-08-03T10:30:00+05:30
+3136a08e-10c2-40e0-a950-7b6286c469f4,TEST-family,End-of-line Test,Dynamometer and electrical test rigs,672ac686-a825-400c-902d-cee8392463da,2026-08-03T10:30:00+05:30,2026-08-03T10:30:00+05:30
+d2a387d2-746b-4e29-bf8e-2faed610bbac,QC-family,Inspection & Packing,Audit bench and packing,672ac686-a825-400c-902d-cee8392463da,2026-08-03T10:30:00+05:30,2026-08-03T10:30:00+05:30

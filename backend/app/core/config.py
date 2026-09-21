@@ -88,9 +88,9 @@ class Settings(BaseSettings):
     #
     # Every path that uses these degrades to a deterministic fallback when
     # Ollama is unreachable. Nothing in the operator journey blocks on a model.
-    ollama_enabled: bool = False
+    ollama_enabled: bool = True
     ollama_base_url: str = "http://localhost:11434/v1"
-    ollama_model: str = "qwen2.5:7b-instruct"
+    ollama_model: str = "qwen3.5:9b"
     ollama_vision_model: str = "qwen2.5vl:7b"
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_timeout_seconds: float = 60.0

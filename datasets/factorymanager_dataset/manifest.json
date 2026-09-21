@@ -1,53 +1,62 @@
 {
   "product": "FactoryManager AI",
-  "schema_revision": "0ba4b6bb4343 (plugin tables: compliance, kaizen, skills)",
+  "schema_revision": "9f3c2d6e8a41 (kaizen plugin edition — the operator journey, config, points and patterns)",
   "seed": 20260913,
   "as_of": "2026-09-12",
   "data_stops_at": "2026-09-12T11:20:00+05:30",
-  "generated_at": "2026-09-13T06:59:31+00:00",
+  "generated_at": "2026-09-19T11:10:39+00:00",
   "timezone_note": "All timestamps are Asia/Kolkata (+05:30). Money columns are integer paise (100 paise = ₹1).",
-  "total_rows": 111308,
+  "total_rows": 419557,
   "tables": {
-    "plants": 4,
-    "users": 37,
-    "alert_recipients": 35,
-    "audit_log": 1074,
-    "audit_packs": 12,
-    "compliance_clauses": 65,
-    "copilot_queries": 730,
-    "cost_families": 22,
-    "cost_rates": 38,
-    "defect_codes": 42,
-    "margin_band_values": 30,
-    "operators": 124,
-    "parts": 39,
-    "readiness_assessments": 60,
-    "reason_codes": 82,
-    "shifts": 13,
-    "template_uploads": 31,
-    "user_plant_roles": 43,
-    "coach_briefings": 770,
-    "job_orders": 449,
-    "routing_operations": 155,
-    "shift_sessions": 534,
-    "stations": 55,
-    "actions": 650,
-    "lots": 608,
-    "operator_skills": 357,
-    "production_targets": 139,
-    "dispatch_records": 1926,
-    "job_sessions": 7506,
-    "kaizen_ideas": 111,
-    "memory_entries": 531,
-    "recovered_profit_entries": 2231,
-    "root_cause_analyses": 185,
-    "stage_completions": 11855,
-    "training_needs": 43,
-    "downtime_events": 3675,
-    "production_counts": 59917,
-    "quality_records": 5015,
-    "action_events": 1493,
-    "escalations": 10622
+    "plants": 9,
+    "users": 84,
+    "alert_recipients": 82,
+    "attachments": 3412,
+    "audit_log": 4281,
+    "audit_packs": 27,
+    "compliance_clauses": 145,
+    "copilot_queries": 2938,
+    "cost_families": 49,
+    "cost_rates": 96,
+    "defect_codes": 97,
+    "kaizen_settings": 9,
+    "margin_band_values": 63,
+    "notifications": 18709,
+    "operators": 347,
+    "parts": 92,
+    "push_subscriptions": 104,
+    "readiness_assessments": 65,
+    "reason_codes": 197,
+    "shifts": 30,
+    "template_uploads": 71,
+    "user_plant_roles": 100,
+    "coach_briefings": 2854,
+    "job_orders": 1791,
+    "kaizen_category_codes": 153,
+    "routing_operations": 406,
+    "shift_sessions": 1984,
+    "stations": 122,
+    "actions": 2272,
+    "lots": 2313,
+    "material_stagings": 1730,
+    "operator_skills": 800,
+    "production_targets": 275,
+    "sync_holds": 39,
+    "dispatch_records": 6824,
+    "job_sessions": 27257,
+    "kaizen_ideas": 542,
+    "kaizen_patterns": 14,
+    "memory_entries": 2006,
+    "recovered_profit_entries": 12228,
+    "root_cause_analyses": 1077,
+    "stage_completions": 43576,
+    "training_needs": 80,
+    "downtime_events": 11202,
+    "kaizen_points": 850,
+    "production_counts": 212846,
+    "quality_records": 18347,
+    "action_events": 4467,
+    "escalations": 32495
   },
   "plants": [
     {
@@ -55,7 +64,7 @@
       "name": "Kumaran Auto Components",
       "location": "Hosur, Tamil Nadu",
       "costing_mode": "standard",
-      "go_live": "2026-06-01",
+      "go_live": "2026-02-16",
       "lot_granularity": "job_lot",
       "shifts": [
         "Shift A",
@@ -67,7 +76,7 @@
       "name": "Sri Vari Pressings Pvt Ltd",
       "location": "Ambattur Industrial Estate, Chennai, Tamil Nadu",
       "costing_mode": "basic",
-      "go_live": "2026-06-15",
+      "go_live": "2026-03-16",
       "lot_granularity": "shift_batch",
       "shifts": [
         "Shift A",
@@ -80,7 +89,7 @@
       "name": "Kovai Precision Engineering",
       "location": "SIDCO Industrial Estate, Kurichi, Coimbatore, Tamil Nadu",
       "costing_mode": "standard",
-      "go_live": "2026-07-20",
+      "go_live": "2026-04-20",
       "lot_granularity": "job_lot",
       "shifts": [
         "Shift 1",
@@ -98,8 +107,83 @@
         "Shift I",
         "Shift II"
       ]
+    },
+    {
+      "code": "VELAVAN",
+      "name": "Velavan Forge & Machining Pvt Ltd",
+      "location": "SIPCOT Ranipet, Vellore, Tamil Nadu",
+      "costing_mode": "standard",
+      "go_live": "2026-04-06",
+      "lot_granularity": "job_lot",
+      "shifts": [
+        "Shift A",
+        "Shift B"
+      ]
+    },
+    {
+      "code": "ANNAI",
+      "name": "Annai Polymers & Precision Moulding",
+      "location": "Sriperumbudur, Kanchipuram, Tamil Nadu",
+      "costing_mode": "basic",
+      "go_live": "2026-05-18",
+      "lot_granularity": "day_batch",
+      "shifts": [
+        "Shift A",
+        "Shift B",
+        "Shift C"
+      ]
+    },
+    {
+      "code": "NILGIRI",
+      "name": "Nilgiri Pumps & Castings",
+      "location": "Kurichi Industrial Estate, Coimbatore, Tamil Nadu",
+      "costing_mode": "standard",
+      "go_live": "2026-06-15",
+      "lot_granularity": "shift_batch",
+      "shifts": [
+        "Shift A",
+        "Shift B"
+      ]
+    },
+    {
+      "code": "THENI",
+      "name": "Theni Sheet Metal & Fabrication",
+      "location": "Kappalur Industrial Estate, Madurai, Tamil Nadu",
+      "costing_mode": "basic",
+      "go_live": "2026-07-13",
+      "lot_granularity": "shift_batch",
+      "shifts": [
+        "Shift A",
+        "Shift B"
+      ]
+    },
+    {
+      "code": "VAIGAI",
+      "name": "Vaigai Auto Electricals Pvt Ltd",
+      "location": "Ambattur Industrial Estate, Chennai, Tamil Nadu",
+      "costing_mode": "standard",
+      "go_live": "2026-08-10",
+      "lot_granularity": "job_lot",
+      "shifts": [
+        "Shift A",
+        "Shift B",
+        "Shift C"
+      ]
     }
   ],
+  "sql_parts": [
+    "000_data.sql",
+    "001_data.sql",
+    "002_data.sql",
+    "003_data.sql",
+    "004_data.sql"
+  ],
+  "csv_files": {
+    "production_counts": [
+      "production_counts.001.csv",
+      "production_counts.002.csv"
+    ]
+  },
   "onboarding_forms": {
     "KUMARAN": {
       "T1": 18,
@@ -136,6 +220,51 @@
       "T5": 26,
       "T6": 30,
       "T7": 9
+    },
+    "VELAVAN": {
+      "T1": 16,
+      "T2": 10,
+      "T3": 54,
+      "T4": 13,
+      "T5": 56,
+      "T6": 34,
+      "T7": 16
+    },
+    "ANNAI": {
+      "T1": 13,
+      "T2": 10,
+      "T3": 42,
+      "T4": 13,
+      "T5": 54,
+      "T6": 34,
+      "T7": 14
+    },
+    "NILGIRI": {
+      "T1": 14,
+      "T2": 10,
+      "T3": 40,
+      "T4": 12,
+      "T5": 43,
+      "T6": 32,
+      "T7": 14
+    },
+    "THENI": {
+      "T1": 11,
+      "T2": 8,
+      "T3": 45,
+      "T4": 10,
+      "T5": 30,
+      "T6": 32,
+      "T7": 11
+    },
+    "VAIGAI": {
+      "T1": 13,
+      "T2": 10,
+      "T3": 45,
+      "T4": 10,
+      "T5": 72,
+      "T6": 33,
+      "T7": 14
     }
   },
   "demo_logins": [
@@ -368,6 +497,300 @@
       "name": "Pandian M.",
       "role": "stores",
       "login": "+919300000306",
+      "password": "stores1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Mr. R. Velavan",
+      "role": "owner",
+      "login": "owner@velavanforge.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Jagadeesan M.",
+      "role": "supervisor",
+      "login": "+919400000401",
+      "password": "plant1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Alagappan S.",
+      "role": "supervisor",
+      "login": "+919400000402",
+      "password": "shift1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Nagarajan K.",
+      "role": "supervisor",
+      "login": "+919400000403",
+      "password": "shift1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Bhuvaneswari R.",
+      "role": "quality",
+      "login": "+919400000404",
+      "password": "quality1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Chitra M.",
+      "role": "quality",
+      "login": "+919400000405",
+      "password": "quality1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Perumal T.",
+      "role": "maintenance",
+      "login": "+919400000406",
+      "password": "maint1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Dhanasekaran V.",
+      "role": "maintenance",
+      "login": "+919400000407",
+      "password": "maint1234"
+    },
+    {
+      "plant": "VELAVAN",
+      "name": "Kaliyaperumal S.",
+      "role": "stores",
+      "login": "+919400000408",
+      "password": "stores1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Mrs. Annapoorani G.",
+      "role": "owner",
+      "login": "owner@annaipolymers.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Srinivasan R.",
+      "role": "supervisor",
+      "login": "+919500000501",
+      "password": "plant1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Ezhilarasan K.",
+      "role": "supervisor",
+      "login": "+919500000502",
+      "password": "shift1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Vasanthakumar P.",
+      "role": "supervisor",
+      "login": "+919500000503",
+      "password": "shift1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Rajendran M.",
+      "role": "supervisor",
+      "login": "+919500000504",
+      "password": "shift1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Amudha S.",
+      "role": "quality",
+      "login": "+919500000505",
+      "password": "quality1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Jothi Lakshmi V.",
+      "role": "quality",
+      "login": "+919500000506",
+      "password": "quality1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Sridhar N.",
+      "role": "maintenance",
+      "login": "+919500000507",
+      "password": "maint1234"
+    },
+    {
+      "plant": "ANNAI",
+      "name": "Anbarasu L.",
+      "role": "stores",
+      "login": "+919500000508",
+      "password": "stores1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Mr. Nallasamy P.",
+      "role": "owner",
+      "login": "owner@nilgiripumps.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Ramakrishnan S.",
+      "role": "supervisor",
+      "login": "+919600000601",
+      "password": "plant1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Marimuthu A.",
+      "role": "supervisor",
+      "login": "+919600000602",
+      "password": "shift1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Selvaraj K.",
+      "role": "supervisor",
+      "login": "+919600000603",
+      "password": "shift1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Hemalatha R.",
+      "role": "quality",
+      "login": "+919600000604",
+      "password": "quality1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Vijayalakshmi T.",
+      "role": "quality",
+      "login": "+919600000605",
+      "password": "quality1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Chinnasamy M.",
+      "role": "maintenance",
+      "login": "+919600000606",
+      "password": "maint1234"
+    },
+    {
+      "plant": "NILGIRI",
+      "name": "Rajamani V.",
+      "role": "stores",
+      "login": "+919600000607",
+      "password": "stores1234"
+    },
+    {
+      "plant": "THENI",
+      "name": "Mr. Thangavel M.",
+      "role": "owner",
+      "login": "owner@thenisheetmetal.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "THENI",
+      "name": "Balasubramanian R.",
+      "role": "supervisor",
+      "login": "+919700000701",
+      "password": "plant1234"
+    },
+    {
+      "plant": "THENI",
+      "name": "Ilangovan S.",
+      "role": "supervisor",
+      "login": "+919700000702",
+      "password": "shift1234"
+    },
+    {
+      "plant": "THENI",
+      "name": "Manikandan P.",
+      "role": "supervisor",
+      "login": "+919700000703",
+      "password": "shift1234"
+    },
+    {
+      "plant": "THENI",
+      "name": "Sumathi K.",
+      "role": "quality",
+      "login": "+919700000704",
+      "password": "quality1234"
+    },
+    {
+      "plant": "THENI",
+      "name": "Karuppasamy V.",
+      "role": "maintenance",
+      "login": "+919700000705",
+      "password": "maint1234"
+    },
+    {
+      "plant": "THENI",
+      "name": "Ponnusamy N.",
+      "role": "stores",
+      "login": "+919700000706",
+      "password": "stores1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Mr. Vaigaivanan K.",
+      "role": "owner",
+      "login": "owner@vaigaielectricals.in",
+      "password": "owner1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Shanmugasundaram R.",
+      "role": "supervisor",
+      "login": "+919800000801",
+      "password": "plant1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Prabakaran M.",
+      "role": "supervisor",
+      "login": "+919800000802",
+      "password": "shift1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Yuvarani S.",
+      "role": "supervisor",
+      "login": "+919800000803",
+      "password": "shift1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Kandasamy T.",
+      "role": "supervisor",
+      "login": "+919800000804",
+      "password": "shift1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Sasirekha P.",
+      "role": "quality",
+      "login": "+919800000805",
+      "password": "quality1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Nithya K.",
+      "role": "quality",
+      "login": "+919800000806",
+      "password": "quality1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Loganathan V.",
+      "role": "maintenance",
+      "login": "+919800000807",
+      "password": "maint1234"
+    },
+    {
+      "plant": "VAIGAI",
+      "name": "Arulmozhi S.",
+      "role": "stores",
+      "login": "+919800000808",
       "password": "stores1234"
     }
   ]

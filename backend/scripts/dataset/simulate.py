@@ -215,11 +215,30 @@ EVENT_NOTES = {
     "MEETING_TRAINING": ["5S training", "Safety meeting"],
 }
 
+#: How each plant numbers a job order. Plants number jobs the way their old
+#: register did, and an owner recognises their own format instantly.
+JOB_NUMBER_FORMAT = {
+    "KUMARAN": lambda n: f"{2200 + n}",
+    "SRIVARI": lambda n: f"SVP-{5100 + n}",
+    "KOVAI": lambda n: f"JO-26-{n:04d}",
+    "SAKTHI": lambda n: f"W{3300 + n}",
+    "VELAVAN": lambda n: f"VF/26/{n:04d}",
+    "ANNAI": lambda n: f"AP-{7400 + n}",
+    "NILGIRI": lambda n: f"NPC{n:05d}",
+    "THENI": lambda n: f"TSM-{n:03d}/26",
+    "VAIGAI": lambda n: f"VE26{n:04d}",
+}
+
 VEHICLE_PREFIX = {
-    "KUMARAN": "TN 70",
-    "SRIVARI": "TN 02",
-    "KOVAI": "TN 37",
-    "SAKTHI": "TN 21",
+    "KUMARAN": "TN 70",  # Hosur
+    "SRIVARI": "TN 02",  # Ambattur
+    "KOVAI": "TN 37",  # Coimbatore
+    "SAKTHI": "TN 21",  # Kanchipuram
+    "VELAVAN": "TN 23",  # Vellore / Ranipet
+    "ANNAI": "TN 21",  # Kanchipuram
+    "NILGIRI": "TN 38",  # Coimbatore south
+    "THENI": "TN 59",  # Madurai
+    "VAIGAI": "TN 12",  # Ambattur
 }
 
 
@@ -1777,12 +1796,7 @@ class PlantSim:
         scale = 1 if self.spec.code == "SAKTHI" else 3
         quantity = rng.randint(low, high) * scale // (2 if from_stock else 1)
         self.job_seq += 1
-        number = {
-            "KUMARAN": f"{2200 + self.job_seq}",
-            "SRIVARI": f"SVP-{5100 + self.job_seq}",
-            "KOVAI": f"JO-26-{self.job_seq:04d}",
-            "SAKTHI": f"W{3300 + self.job_seq}",
-        }.get(self.spec.code, str(self.job_seq))
+        number = self._job_number()
         created = max(self.onboard_at, when - timedelta(hours=rng.randint(6, 72)))
         notes = None
         if from_stock:
@@ -1902,6 +1916,11 @@ class PlantSim:
             job.ready_day = next_working_day(when.date())
             self.finishing.append(job)
 
+    def _job_number(self) -> str:
+        """This plant's job-order number for the current ``job_seq``."""
+        fmt = JOB_NUMBER_FORMAT.get(self.spec.code)
+        return fmt(self.job_seq) if fmt else str(self.job_seq)
+
     def _finish_jobs(self, day: date) -> None:
         """QC and dispatch operations for jobs whose last machine op is done."""
         rng = self.rng
@@ -1912,6 +1931,15 @@ class PlantSim:
             if clock + timedelta(hours=4 + 2 * len(job.finish_lots)) > self.now:
                 continue
             ops = job.part.ops[job.finish_from :]
+            if not ops:
+                # A routing whose last operation runs on a producing station has
+                # nowhere to be inspected and dispatched. That is a catalog
+                # error, not a simulation state — say so plainly.
+                raise ValueError(
+                    f"{self.spec.code} {job.part.spec.number}: routing ends on a "
+                    "producing operation, so the job has no inspection or "
+                    "dispatch step. Add a QC/dispatch operation to the part."
+                )
             last = ops[-1]
             for lot, quantity in job.finish_lots:
                 for op in ops[:-1]:
@@ -2936,6 +2964,47 @@ class PlantSim:
                 kind="reject",
             )
 
+    def _target_total(self, ctx, ran: list) -> int:
+        """``reports.resolve_targets(...).total_for(ran)``, over in-memory rows.
+
+        Summing every station's target instead would freeze a number the live
+        KPI screen never reproduces: the service counts only the stations that
+        actually ran, and falls back to a line's target for a line whose
+        stations have none.
+        """
+        rows = [
+            row
+            for row in self.target_rows
+            if row["effective_from"] <= ctx.day
+            and row["shift_id"] in (None, ctx.sh.id)
+        ]
+        # Same ordering as the query: all-shift rows first, then shift-specific
+        # ones; later rows override earlier ones.
+        rows.sort(
+            key=lambda row: (
+                row["shift_id"] is not None,
+                row["effective_from"],
+                row["created_at"],
+            )
+        )
+        by_station: dict = {}
+        by_line: dict = {}
+        for row in rows:
+            if row["station_id"] is not None:
+                by_station[row["station_id"]] = int(row["target_parts"])
+            elif row["line"]:
+                by_line[row["line"]] = int(row["target_parts"])
+
+        ran_by_id = {st.id: st for st in ran}
+        total = sum(by_station.get(sid, 0) for sid in ran_by_id)
+        lines_with_station_targets = {
+            st.spec.line for sid, st in ran_by_id.items() if sid in by_station
+        }
+        for line in {st.spec.line for st in ran_by_id.values() if st.spec.line}:
+            if line not in lines_with_station_targets:
+                total += by_line.get(line, 0)
+        return total
+
     def _summary(self, ctx, actions_created: int) -> dict:
         """The frozen KPI snapshot written at close.
 
@@ -2993,11 +3062,7 @@ class PlantSim:
                 )
             )
         oee, station_results = aggregate_oee(runs)
-        targets = {}
-        for row in self.target_rows:
-            if row["effective_from"] <= ctx.day and row["station_id"] is not None:
-                targets[row["station_id"]] = row["target_parts"]
-        target_total = sum(targets.values())
+        target_total = self._target_total(ctx, [st for st, _s, _e, _p in ctx.events if _s])
         breakdowns = count_breakdowns(slices)
         per_station = [
             {
@@ -3490,7 +3555,12 @@ class PlantSim:
         rng = self.rng
         as_of = min(day + timedelta(days=1), self.as_of)
         run_at = min(at(day, "23:05"), self.now)
-        for plan in self.actions:
+        # Oldest closure first: a week belongs to whichever fix closed first
+        # (§12 risk 11), and that can only be decided in closure order.
+        for plan in sorted(
+            self.actions,
+            key=lambda p: (p.action["closed_at"] is None, p.action["closed_at"] or run_at),
+        ):
             row = plan.action
             if row["state"] not in ("monitoring", "verified") or row["closed_at"] is None:
                 continue
@@ -3556,6 +3626,8 @@ class PlantSim:
                 weeks_after_closure=weeks,
                 reopened=False,
             )
+            claimed = self._weeks_claimed_elsewhere(row)
+            credited = counted_weeks = 0
             for (week, saving), observed in zip(
                 result.weekly_breakdown, weeks, strict=True
             ):
@@ -3569,13 +3641,17 @@ class PlantSim:
                         action_id=row["id"],
                         week_start=week,
                     )
+                creditable = week in result.counted_weeks
+                counts = creditable and week not in claimed
                 entry.update(
                     baseline_weekly_loss=row["baseline_weekly_loss"],
                     actual_weekly_loss=observed.loss,
                     saving=saving,
-                    counted=result.sustained and saving > 0,
+                    counted=counts,
                     updated_at=run_at,
-                    note=(
+                    note=f"Already credited to {claimed[week]}"
+                    if creditable and week in claimed
+                    else (
                         "Held below baseline."
                         if saving > 0
                         else "At or above baseline — nothing credited this week."
@@ -3583,9 +3659,12 @@ class PlantSim:
                     if result.sustained
                     else result.reason,
                 )
+                if counts:
+                    credited += saving
+                    counted_weeks += 1
             row.update(
-                recovered_profit=result.recovered,
-                sustained_weeks=result.weeks_counted,
+                recovered_profit=(row["recovered_profit_prior"] or 0) + credited,
+                sustained_weeks=counted_weeks,
                 updated_at=run_at,
             )
             if result.sustained and row["state"] == "monitoring":
@@ -3601,6 +3680,30 @@ class PlantSim:
                         updated_at=run_at,
                     )
                     self._award_points(plan.kaizen, "verified", run_at.date())
+
+    def _weeks_claimed_elsewhere(self, row: dict) -> dict[date, str]:
+        """``actions._weeks_claimed_elsewhere`` over the in-memory rows.
+
+        The same rupee must not be counted twice when one problem is fixed,
+        comes back and is fixed again: the week belongs to the Action that
+        closed first, and the later one is told so in its ledger note.
+        """
+        scope = ("station_id", "reason_code_id", "part_id")
+        claimed: dict[date, str] = {}
+        for other in self.actions:
+            side = other.action
+            if side["id"] == row["id"] or side["closed_at"] is None:
+                continue
+            if side["closed_at"] >= row["closed_at"]:
+                continue
+            if (side["loss_source"] or "downtime") != (row["loss_source"] or "downtime"):
+                continue
+            if any(side[column] != row[column] for column in scope):
+                continue
+            for (action_id, week), entry in self.rp_rows.items():
+                if action_id == side["id"] and entry["counted"]:
+                    claimed.setdefault(week, side["reference"])
+        return claimed
 
     def _manual_actions(self, day: date) -> None:
         rng = self.rng
@@ -4853,7 +4956,11 @@ class PlantSim:
         if day.day != 1 or day < self.spec.go_live + timedelta(days=45):
             return
         settings = self.kaizen_settings
-        window = day - timedelta(days=120)
+        # The plant's own configured History Check window (§6.1), not a second
+        # number invented here: a pattern is a claim about what Core recorded,
+        # over exactly the period the plugin says it looks back.
+        window_days = settings["history_window_days"]
+        window = day - timedelta(days=window_days)
         clusters: dict[tuple, list[dict]] = defaultdict(list)
         for idea in self.kaizen_rows:
             if idea["submitted_on"] is None or idea["submitted_on"] < window:
@@ -4916,7 +5023,8 @@ class PlantSim:
                 recommendation=(
                     f"{len(ideas)} operators have independently raised "
                     f"'{reason.label}' on {where}. Core recorded {len(events)} "
-                    f"events costing {format_inr(cost)} over the same 120 days. "
+                    f"events costing {format_inr(cost)} over the same "
+                    f"{window_days} days. "
                     "Treat this as one problem with one owner, not five ideas."
                 ),
                 action_id=None,
@@ -5328,12 +5436,7 @@ class PlantSim:
         for _ in range(rng.randint(3, 6)):
             part = rng.choice([p for p in self.parts.values() if p.active])
             self.job_seq += 1
-            number = {
-                "KUMARAN": f"{2200 + self.job_seq}",
-                "SRIVARI": f"SVP-{5100 + self.job_seq}",
-                "KOVAI": f"JO-26-{self.job_seq:04d}",
-                "SAKTHI": f"W{3300 + self.job_seq}",
-            }[spec.code]
+            number = self._job_number()
             low, high = part.spec.lot_size
             self.s.add(
                 "job_orders",

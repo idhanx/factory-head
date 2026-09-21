@@ -711,3 +711,47 @@ async def test_a_question_the_copilot_did_not_understand_is_not_answered_as_if_i
             session, plant=plant, question=question, as_of=as_of
         )
         assert intent == expected, question
+
+
+async def test_ask_refuses_to_answer_when_the_database_has_no_fact_bundle():
+    """The Ask flow must refuse any question the plant's database cannot answer."""
+    from datetime import date
+
+    from app.ai.copilot import _answer
+    from app.ai.facts import FactBundle
+
+    bundle = FactBundle(plant_name="Demo Plant", as_of=date.today(), tier=0)
+    answer, answered_by = await _answer(
+        bundle=bundle,
+        question="What is the latest machine downtime for Plant A?",
+        language="en",
+        use_llm=False,
+    )
+
+    assert answer == (
+        "Sorry, I do not have an answer for this question. Please ask me a "
+        "professional or core-based question."
+    )
+    assert answered_by == "deterministic"
+
+
+async def test_ask_refuses_off_topic_questions_like_apple_color():
+    """Off-topic consumer questions are not plant data and must be refused."""
+    from datetime import date
+
+    from app.ai.copilot import _answer
+    from app.ai.facts import FactBundle
+
+    bundle = FactBundle(plant_name="Demo Plant", as_of=date.today(), tier=0)
+    answer, answered_by = await _answer(
+        bundle=bundle,
+        question="what is the apple colour red or blue",
+        language="en",
+        use_llm=False,
+    )
+
+    assert answer == (
+        "Sorry, I do not have an answer for this question. Please ask me a "
+        "professional or core-based question."
+    )
+    assert answered_by == "deterministic"

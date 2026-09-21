@@ -26,7 +26,17 @@ from __future__ import annotations
 
 from datetime import date
 
-from .specs import Chronic, Op, PartSpec, PersonSpec, PlantSpec, RateSpec, ShiftSpec, StationSpec
+from .specs import (
+    Chronic,
+    Op,
+    PartSpec,
+    PersonSpec,
+    PlantSpec,
+    RateSpec,
+    ShiftSpec,
+    StationSpec,
+    ensure_dispatch_operation,
+)
 
 # ---------------------------------------------------------------------------
 # T6 — the default reason-code library (§15, §16.4), shared by every plant
@@ -1859,7 +1869,15 @@ SAKTHI = PlantSpec(
     kaizen_ideas=16,
 )
 
-PLANTS: list[PlantSpec] = [KUMARAN, SRIVARI, KOVAI, SAKTHI]
+# The five plants in catalog_group are appended, never interleaved: the
+# simulation draws from one shared RNG in plant order, so anything added at the
+# end leaves the first four plants' rows exactly as they were.
+from .catalog_group import EXTRA_PLANTS  # noqa: E402
+
+PLANTS: list[PlantSpec] = [
+    ensure_dispatch_operation(plant)
+    for plant in (KUMARAN, SRIVARI, KOVAI, SAKTHI, *EXTRA_PLANTS)
+]
 
 # Platform-level accounts that span plants (§1: "the same consultant account
 # supports several plants").

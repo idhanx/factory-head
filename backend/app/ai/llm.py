@@ -1,4 +1,4 @@
-"""LLM client — vLLM behind its OpenAI-compatible API.
+"""LLM client — the locally installed Ollama model behind its OpenAI API.
 
 We speak HTTP to vLLM rather than importing it, so the API process never loads
 a model into memory and the serving tier scales (or fails) independently.
@@ -54,14 +54,14 @@ class LlmProvider:
         model: str | None = None,
         timeout: float | None = None,
     ) -> None:
-        self.base_url = (base_url or settings.llm_base_url).rstrip("/")
-        self.api_key = api_key or settings.llm_api_key
-        self.model = model or settings.llm_model
-        self.timeout = timeout or settings.llm_timeout_seconds
+        self.base_url = (base_url or settings.ollama_base_url).rstrip("/")
+        self.api_key = api_key or "ollama"
+        self.model = model or settings.ollama_model
+        self.timeout = timeout or settings.ollama_timeout_seconds
 
     @property
     def enabled(self) -> bool:
-        return settings.llm_enabled
+        return settings.ollama_enabled
 
     async def generate(
         self,
@@ -72,7 +72,7 @@ class LlmProvider:
         max_tokens: int | None = None,
     ) -> Generation:
         if not self.enabled:
-            raise LlmUnavailable("LLM serving is disabled (LLM_ENABLED=false)")
+            raise LlmUnavailable("Ollama is disabled (OLLAMA_ENABLED=false)")
 
         payload: dict[str, Any] = {
             "model": self.model,

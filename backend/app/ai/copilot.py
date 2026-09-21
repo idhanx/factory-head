@@ -20,10 +20,14 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.facts import build_question_facts
-from app.ai.llm import GROUNDING_SYSTEM_PROMPT, LlmProvider, LlmUnavailable
+from app.ai.llm import GROUNDING_SYSTEM_PROMPT, LlmUnavailable, OllamaProvider
 from app.models import CopilotQuery, Plant
 
 LANGUAGES = {"en": "English", "ta": "Tamil"}
+NO_DATA_ANSWER = (
+    "Sorry, I do not have an answer for this question. Please ask me a "
+    "professional or core-based question."
+)
 
 
 @dataclass(slots=True)
@@ -94,16 +98,57 @@ async def ask(
     )
 
 
+def _is_non_factory_question(question: str) -> bool:
+    text = question.lower()
+    factory_keywords = (
+        "plant",
+        "shift",
+        "station",
+        "machine",
+        "downtime",
+        "loss",
+        "scrap",
+        "defect",
+        "quality",
+        "ppm",
+        "maintenance",
+        "stores",
+        "material",
+        "operator",
+        "production",
+        "reason",
+        "cost",
+        "profit",
+        "performance",
+        "today",
+        "week",
+        "month",
+        "issue",
+        "fix",
+        "action",
+        "job",
+        "line",
+        "breakdown",
+    )
+    return not any(keyword in text for keyword in factory_keywords)
+
+
 async def _answer(
     *, bundle, question: str, language: str, use_llm: bool
 ) -> tuple[str, str]:
     deterministic = _deterministic_answer(bundle)
 
+    if _is_non_factory_question(question):
+        return (NO_DATA_ANSWER, "deterministic")
+
+    if not bundle.facts and not bundle.evidence:
+        return (NO_DATA_ANSWER, "deterministic")
+
     if not use_llm:
         return (deterministic, "deterministic")
 
     try:
-        provider = LlmProvider()
+        provider = OllamaProvider()
         generation = await provider.generate(
             system=GROUNDING_SYSTEM_PROMPT.format(
                 language=LANGUAGES.get(language, "English")

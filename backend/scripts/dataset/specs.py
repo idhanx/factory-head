@@ -7,7 +7,7 @@ Separated from :mod:`catalog` so that a second file of plants
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
 
@@ -128,3 +128,56 @@ class PlantSpec:
     event_weights: dict[str, float] = field(default_factory=dict)
     events_per_shift: tuple[int, int, int, int] = (56, 30, 10, 4)
     kaizen_ideas: int = 30
+
+
+def _producing_families(plant: PlantSpec) -> set[str]:
+    return {s.family for s in plant.stations if s.section in ("machining", "assembly")}
+
+
+def ensure_dispatch_operation(plant: PlantSpec) -> PlantSpec:
+    """Give every part a packing step after its final inspection.
+
+    ``catalog._parts`` reads a routing's trailing non-producing operations as
+    "inspection … then dispatch", taking the last one as the gate. A part with
+    only one of them therefore has no inspection stage at all, and the flow
+    reconciliation ends up comparing the gate straight against the last machine
+    — which on a batch lot reports parts as lost at the gate when they are
+    simply still being made. Every plant's parts need two.
+
+    Applied to every plant rather than written out part by part: it is an
+    invariant of how routings are read, so it belongs next to that rule and not
+    in forty-five separate tuples that can each be got wrong.
+    """
+    producing = _producing_families(plant)
+    quality_family = next(
+        (
+            op.family
+            for part in plant.parts
+            for op in part.routing
+            if op.family not in producing
+        ),
+        None,
+    )
+    if quality_family is None:
+        return plant
+
+    parts = []
+    for part in plant.parts:
+        tail = 0
+        for op in reversed(part.routing):
+            if op.family in producing:
+                break
+            tail += 1
+        if tail >= 2:
+            parts.append(part)
+            continue
+        last = part.routing[-1]
+        sequence = int(last.code.removeprefix("Op") or 0) + 10
+        parts.append(
+            replace(
+                part,
+                routing=part.routing
+                + (Op(f"Op{sequence}", quality_family, "0.2"),),
+            )
+        )
+    return replace(plant, parts=parts)

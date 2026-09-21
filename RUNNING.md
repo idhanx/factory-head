@@ -24,6 +24,35 @@ Stores are the two whose cadence §1 gives as *"when events occur"*, so their
 home is the desk showing what is happening now — the alerts routed to them, and
 the one thing §1 says each of them writes.
 
+### Which database it is on
+
+`backend/.env` points at **`iea_factory_ai_full`**, which holds the full test
+dataset: 419,557 rows across all 49 tables, nine plants, data to 2026-09-12.
+The logins above still work — KUMARAN is in the dataset too — and the other
+eight plants each have their own owner, supervisors, inspectors, maintenance
+and stores accounts. Every login is listed in
+`datasets/factorymanager_dataset/README.md`, for example:
+
+| Plant | Owner login | Password |
+|---|---|---|
+| VELAVAN | `owner@velavanforge.in` | `owner1234` |
+| ANNAI | `owner@annaipolymers.in` | `owner1234` |
+| NILGIRI | `owner@nilgiripumps.in` | `owner1234` |
+| THENI | `owner@thenisheetmetal.in` | `owner1234` |
+| VAIGAI | `owner@vaigaielectricals.in` | `owner1234` |
+
+The previous database, `iea_factory_ai`, is untouched and still holds the older
+four-plant data. To go back, point both URLs in `backend/.env` at it again and
+restart the API.
+
+To reload the dataset from scratch (destructive — it empties every table first):
+
+```bash
+cd datasets/factorymanager_dataset/sql
+psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -f 00_reset_all_tables.sql
+psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -f factorymanager_data.sql
+```
+
 ---
 
 ## Option A — Docker (the normal way)

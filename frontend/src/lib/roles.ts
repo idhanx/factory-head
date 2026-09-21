@@ -61,8 +61,24 @@ export function navEntryFor(pathname: string) {
   return NAV.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 }
 
+/**
+ * Sub-routes that are stricter than the NAV entry they sit under.
+ *
+ * `/kpis` is every role's, but the monthly report it links to is the owner's
+ * P&L — `GET /reports/monthly` is owner-only. Without this, prefix matching
+ * hands `/kpis/monthly` the parent's roles and a supervisor who types the URL
+ * lands on exactly the page of 403s the redirect above exists to prevent.
+ */
+const STRICTER_SUBROUTES: Array<{ prefix: string; roles: Role[] }> = [
+  { prefix: "/kpis/monthly", roles: ADMINS },
+];
+
 /** A page with no NAV entry is not role-gated here; the API still is. */
 export function canReach(roles: Role[], pathname: string): boolean {
+  const stricter = STRICTER_SUBROUTES.find(
+    (item) => pathname === item.prefix || pathname.startsWith(`${item.prefix}/`),
+  );
+  if (stricter) return can(roles, ...stricter.roles);
   const entry = navEntryFor(pathname);
   return !entry || can(roles, ...entry.roles);
 }

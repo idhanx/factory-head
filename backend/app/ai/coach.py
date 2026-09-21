@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.facts import FactBundle, build_shift_facts
-from app.ai.llm import GROUNDING_SYSTEM_PROMPT, LlmProvider, LlmUnavailable
+from app.ai.llm import GROUNDING_SYSTEM_PROMPT, LlmUnavailable, OllamaProvider
 from app.kernel import CoachTier, format_inr
 from app.models import AlertRecipient, CoachBriefing, Plant, Shift
 
@@ -207,7 +207,7 @@ async def _render(
         return (deterministic, "rules")
 
     try:
-        provider = LlmProvider()
+        provider = OllamaProvider()
         generation = await provider.generate(
             system=GROUNDING_SYSTEM_PROMPT.format(language="English"),
             user=(

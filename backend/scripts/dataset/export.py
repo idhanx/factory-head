@@ -68,46 +68,119 @@ def _plain(value, column):
 # ---------------------------------------------------------------------------
 
 
-def write_sql(store: Store, path: Path, header: str) -> None:
-    def literal(value, column) -> str:
-        text = _plain(value, column)
-        if text is None:
-            return "NULL"
-        if isinstance(value, bool):
-            return "TRUE" if value else "FALSE"
-        if isinstance(value, (int, Decimal)) and not isinstance(
-            column.type, (JSONB, ARRAY)
-        ):
-            return text
-        return "'" + text.replace("'", "''") + "'"
+#: Largest data file we will write. GitHub refuses a file over 100 MB outright
+#: and warns above 50 MB, and this dataset is meant to live in the repository —
+#: so the load is split into parts rather than shrunk.
+MAX_PART_BYTES = 40 * 1024 * 1024
 
-    with path.open("w", encoding="utf-8") as out:
-        out.write(header)
-        out.write(
-            "\nSET client_encoding = 'UTF8';\nSET standard_conforming_strings = on;\nSET search_path = public;\n\nBEGIN;\n"
-        )
-        for name in store.order:
-            rows = store.rows[name]
-            if not rows:
-                continue
-            columns = list(store.tables[name].columns)
-            names = ", ".join(c.name for c in columns)
-            out.write(f"\n-- {name}: {len(rows)} rows\n")
-            for start in range(0, len(rows), BATCH):
-                chunk = rows[start : start + BATCH]
-                out.write(f"INSERT INTO {name} ({names}) VALUES\n")
-                out.write(
-                    ",\n".join(
-                        "(" + ", ".join(literal(row[c.name], c) for c in columns) + ")"
-                        for row in chunk
-                    )
-                )
-                out.write(";\n")
-        out.write("\nCOMMIT;\n")
+
+def _ident(name: str) -> str:
+    """A column or table name, always quoted.
+
+    ``kaizen_ideas.similar`` is the reason this exists: SIMILAR is reserved in
+    PostgreSQL, so an unquoted column list is a syntax error. Quoting every
+    identifier costs nothing and means a new column can be called whatever the
+    model calls it.
+    """
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _literal(value, column) -> str:
+    text = _plain(value, column)
+    if text is None:
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, Decimal)) and not isinstance(column.type, (JSONB, ARRAY)):
+        return text
+    return "'" + text.replace("'", "''") + "'"
+
+
+def write_sql(store: Store, path: Path, header: str) -> list[str]:
+    r"""Write the data as one transaction, split across numbered part files.
+
+    ``path`` becomes a small entry point that ``\i``-includes each part in
+    foreign-key order, so loading is still a single psql command. The parts
+    themselves carry no BEGIN/COMMIT: the entry point owns the transaction, and
+    a part that is loaded on its own would otherwise commit a half-loaded
+    schema.
+
+    Returns the part file names, for the manifest.
+    """
+    parts_dir = path.parent / "data"
+    for stale in parts_dir.glob("*.sql"):
+        stale.unlink()
+    parts_dir.mkdir(parents=True, exist_ok=True)
+
+    parts: list[str] = []
+    handle = None
+    written = 0
+
+    def close() -> None:
+        nonlocal handle
+        if handle is not None:
+            handle.close()
+            handle = None
+
+    def part_for(size: int):
+        """The open part file with room for ``size`` more bytes."""
+        nonlocal handle, written
+        if handle is not None and written + size > MAX_PART_BYTES:
+            close()
+        if handle is None:
+            name = f"{len(parts):03d}_data.sql"
+            parts.append(name)
+            handle = (parts_dir / name).open("w", encoding="utf-8")
+            handle.write(
+                f"-- FactoryManager AI dataset, part {len(parts)}.\n"
+                "-- Included by ../factorymanager_data.sql, which owns the transaction.\n"
+            )
+            written = 0
+        return handle
+
+    for name in store.order:
+        rows = store.rows[name]
+        if not rows:
+            continue
+        columns = list(store.tables[name].columns)
+        names = ", ".join(_ident(c.name) for c in columns)
+        for start in range(0, len(rows), BATCH):
+            chunk = rows[start : start + BATCH]
+            body = ",\n".join(
+                "(" + ", ".join(_literal(row[c.name], c) for c in columns) + ")"
+                for row in chunk
+            )
+            statement = (
+                f"\n-- {name}: rows {start + 1}-{start + len(chunk)} of {len(rows)}\n"
+                f"INSERT INTO {_ident(name)} ({names}) VALUES\n{body};\n"
+            )
+            encoded = len(statement.encode("utf-8"))
+            out = part_for(encoded)
+            out.write(statement)
+            written += encoded
+    close()
+
+    includes = "\n".join(f"\\i data/{name}" for name in parts)
+    path.write_text(
+        header
+        + "\n-- The data itself is in data/*.sql, split so that no single file\n"
+        "-- exceeds GitHub's file-size limit. Load this file, not the parts:\n"
+        "--   psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f factorymanager_data.sql\n"
+        "-- psql resolves \\i relative to the file it is reading, so run it from\n"
+        "-- anywhere.\n"
+        "\nSET client_encoding = 'UTF8';\n"
+        "SET standard_conforming_strings = on;\n"
+        "SET search_path = public;\n"
+        "\nBEGIN;\n"
+        f"{includes}\n"
+        "\nCOMMIT;\n",
+        encoding="utf-8",
+    )
+    return parts
 
 
 def write_reset_sql(store: Store, path: Path) -> None:
-    tables = ", ".join(reversed(store.order))
+    tables = ", ".join(_ident(t) for t in reversed(store.order))
     path.write_text(
         "-- DESTRUCTIVE: empties every FactoryManager AI table before loading the dataset.\n"
         "-- Run only against a database you intend to overwrite (not production).\n"
@@ -121,35 +194,90 @@ def write_reset_sql(store: Store, path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def write_csv(store: Store, folder: Path) -> None:
+def write_csv(store: Store, folder: Path) -> dict[str, list[str]]:
+    r"""One CSV per table, plus a ``\copy`` loader.
+
+    A table whose CSV would pass :data:`MAX_PART_BYTES` is split into
+    ``<table>.001.csv``, ``<table>.002.csv`` … — same reason as the SQL parts,
+    and the loader copies each in turn, so nothing about loading changes.
+
+    Returns {table: [file names]} for the manifest.
+    """
     folder.mkdir(parents=True, exist_ok=True)
+    for stale in folder.glob("*.csv"):
+        stale.unlink()
+
     lines = [
         "-- psql script: run from inside the csv/ folder with",
         '--   psql "$DATABASE_URL" -f load_csv.sql',
         "\\set ON_ERROR_STOP on",
         "BEGIN;",
     ]
+    written: dict[str, list[str]] = {}
+
     for name in store.order:
         columns = list(store.tables[name].columns)
-        with (folder / f"{name}.csv").open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.writer(handle)
-            writer.writerow([c.name for c in columns])
-            for row in store.rows[name]:
-                values = []
-                for column in columns:
-                    text = _plain(row[column.name], column)
-                    if text == "":
-                        raise ValueError(
-                            f"{name}.{column.name}: empty string would load as NULL"
-                        )
-                    values.append(text)
-                writer.writerow(values)
-        cols = ", ".join(c.name for c in columns)
-        lines.append(
-            f"\\copy {name} ({cols}) FROM '{name}.csv' WITH (FORMAT csv, HEADER true)"
-        )
+        header = [c.name for c in columns]
+        rows = store.rows[name]
+
+        # Measure while writing rather than guessing: one pass, and the split
+        # lands on a row boundary because that is the only place it can.
+        files: list[str] = []
+        handle = writer = None
+        size = 0
+
+        def close():
+            nonlocal handle
+            if handle is not None:
+                handle.close()
+                handle = None
+
+        for row in rows:
+            values = []
+            for column in columns:
+                text = _plain(row[column.name], column)
+                if text == "":
+                    raise ValueError(
+                        f"{name}.{column.name}: empty string would load as NULL"
+                    )
+                values.append(text)
+            line = io.StringIO()
+            csv.writer(line).writerow(values)
+            encoded = len(line.getvalue().encode("utf-8"))
+            if handle is not None and size + encoded > MAX_PART_BYTES:
+                close()
+            if handle is None:
+                part = f"{name}.csv" if not files else None
+                if part is None:
+                    # Growing past one file: the first one gets renumbered too,
+                    # so the set reads as a set rather than a file plus scraps.
+                    if len(files) == 1 and files[0] == f"{name}.csv":
+                        (folder / files[0]).rename(folder / f"{name}.001.csv")
+                        files[0] = f"{name}.001.csv"
+                    part = f"{name}.{len(files) + 1:03d}.csv"
+                files.append(part)
+                handle = (folder / part).open("w", encoding="utf-8", newline="")
+                writer = csv.writer(handle)
+                writer.writerow(header)
+                size = 0
+            handle.write(line.getvalue())
+            size += encoded
+        close()
+        if not files:  # an empty table still gets a header-only file
+            files = [f"{name}.csv"]
+            with (folder / files[0]).open("w", encoding="utf-8", newline="") as empty:
+                csv.writer(empty).writerow(header)
+
+        written[name] = files
+        cols = ", ".join(_ident(c) for c in header)
+        for part in files:
+            lines.append(
+                f"\\copy {_ident(name)} ({cols}) FROM '{part}' WITH (FORMAT csv, HEADER true)"
+            )
+
     lines.append("COMMIT;")
     (folder / "load_csv.sql").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return written
 
 
 # ---------------------------------------------------------------------------

@@ -1,13 +1,16 @@
--- FactoryManager AI schema at Alembic head 0ba4b6bb4343, dumped from a database built by
---   alembic upgrade head   (plain PostgreSQL 16, no TimescaleDB: hypertables are an optional optimisation)
+-- FactoryManager AI schema at Alembic head 9f3c2d6e8a41, dumped from a database built by
+--   alembic upgrade head   (plain PostgreSQL, no TimescaleDB: hypertables are an optional optimisation)
 -- Load this first into an empty database, then factorymanager_data.sql.
+-- Head message: kaizen plugin edition — the operator journey, config, points and patterns
 
 --
 -- PostgreSQL database dump
 --
 
+\restrict Ce18OGkUt78BFlxPAxcR7yEJhEznwH8ElCZ5RPvc8EE9tChXPOfebcwRp6tlr4c
+
 -- Dumped from database version 16.6
--- Dumped by pg_dump version 16.6
+-- Dumped by pg_dump version 18.6 (Debian 18.6-3)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -34,6 +37,8 @@ CREATE TABLE public.action_events (
     downtime_event_id uuid NOT NULL,
     plant_id uuid NOT NULL
 );
+
+ALTER TABLE ONLY public.action_events FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -73,8 +78,14 @@ CREATE TABLE public.actions (
     delay_reason text,
     plant_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    loss_source character varying(12) DEFAULT 'downtime'::character varying NOT NULL,
+    part_id uuid,
+    recovered_profit_prior bigint DEFAULT '0'::bigint NOT NULL,
+    meeting_status_on date
 );
+
+ALTER TABLE ONLY public.actions FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -103,6 +114,32 @@ CREATE TABLE public.alert_recipients (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.alert_recipients FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: attachments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.attachments (
+    id uuid NOT NULL,
+    entity_type character varying(24) NOT NULL,
+    entity_id uuid NOT NULL,
+    filename character varying(200),
+    content_type character varying(64) NOT NULL,
+    size_bytes bigint NOT NULL,
+    width bigint,
+    height bigint,
+    sha256 character varying(64) NOT NULL,
+    storage_key character varying(300) NOT NULL,
+    uploaded_by_id uuid,
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.attachments FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: audit_log; Type: TABLE; Schema: public; Owner: -
@@ -120,6 +157,8 @@ CREATE TABLE public.audit_log (
     reason text,
     occurred_at timestamp with time zone NOT NULL
 );
+
+ALTER TABLE ONLY public.audit_log FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -139,6 +178,8 @@ CREATE TABLE public.audit_packs (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.audit_packs FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -163,6 +204,8 @@ CREATE TABLE public.coach_briefings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.coach_briefings FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: compliance_clauses; Type: TABLE; Schema: public; Owner: -
@@ -185,6 +228,8 @@ CREATE TABLE public.compliance_clauses (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.compliance_clauses FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -209,6 +254,8 @@ CREATE TABLE public.copilot_queries (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.copilot_queries FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: cost_families; Type: TABLE; Schema: public; Owner: -
@@ -223,6 +270,8 @@ CREATE TABLE public.cost_families (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.cost_families FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -242,8 +291,11 @@ CREATE TABLE public.cost_rates (
     effective_to date,
     plant_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    unit_rate bigint DEFAULT '0'::bigint NOT NULL
 );
+
+ALTER TABLE ONLY public.cost_rates FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -263,6 +315,8 @@ CREATE TABLE public.defect_codes (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.defect_codes FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: dispatch_records; Type: TABLE; Schema: public; Owner: -
@@ -280,6 +334,8 @@ CREATE TABLE public.dispatch_records (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.dispatch_records FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -315,8 +371,15 @@ CREATE TABLE public.downtime_events (
     snapshot_bottleneck_factor numeric(3,2) NOT NULL,
     snapshot_costing_mode character varying(16) NOT NULL,
     formula_version integer NOT NULL,
+    client_ref character varying(64),
+    repair_note text,
+    repair_part_changed character varying(200),
+    repaired_by_id uuid,
+    repaired_at timestamp with time zone,
     CONSTRAINT ck_downtime_time_order CHECK (((ended_at IS NULL) OR (ended_at >= started_at)))
 );
+
+ALTER TABLE ONLY public.downtime_events FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -339,8 +402,13 @@ CREATE TABLE public.escalations (
     acknowledged_at timestamp with time zone,
     plant_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    acknowledged_by_id uuid,
+    resolved_at timestamp with time zone,
+    route character varying(20)
 );
+
+ALTER TABLE ONLY public.escalations FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -362,6 +430,8 @@ CREATE TABLE public.job_orders (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.job_orders FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -385,6 +455,25 @@ CREATE TABLE public.job_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.job_sessions FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: kaizen_category_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.kaizen_category_codes (
+    id uuid NOT NULL,
+    category character varying(20) NOT NULL,
+    reason_code_id uuid,
+    defect_code_id uuid,
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.kaizen_category_codes FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: kaizen_ideas; Type: TABLE; Schema: public; Owner: -
@@ -396,11 +485,10 @@ CREATE TABLE public.kaizen_ideas (
     title character varying(300) NOT NULL,
     description text NOT NULL,
     submitted_by_name character varying(200) NOT NULL,
-    submitted_by_operator_id uuid,
+    credited_operator_id uuid,
     station_id uuid,
     reason_code_id uuid,
     status character varying(20) NOT NULL,
-    estimated_annual_saving bigint NOT NULL,
     effort_score integer NOT NULL,
     impact_score integer NOT NULL,
     score_rationale text,
@@ -410,8 +498,138 @@ CREATE TABLE public.kaizen_ideas (
     decision_note text,
     plant_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    track character varying(8) DEFAULT 'full'::character varying NOT NULL,
+    voice_transcript text,
+    voice_language character varying(8),
+    submitted_by_user_id uuid,
+    credited_name character varying(200) NOT NULL,
+    board character varying(16) DEFAULT 'shopfloor'::character varying NOT NULL,
+    department character varying(64),
+    submitted_on date,
+    job_order_id uuid,
+    part_id uuid,
+    defect_code_id uuid,
+    context_confirmed boolean DEFAULT false NOT NULL,
+    unknown_station_note character varying(300),
+    category character varying(20),
+    saving_type character varying(24),
+    vision_findings jsonb,
+    vision_ran boolean DEFAULT false NOT NULL,
+    interview jsonb,
+    history jsonb,
+    "similar" jsonb,
+    challenge jsonb,
+    forecast jsonb,
+    fingerprint character varying(48)[],
+    embedding numeric(12,8)[],
+    core_value_paise bigint DEFAULT '0'::bigint NOT NULL,
+    hard_saving_paise bigint DEFAULT '0'::bigint NOT NULL,
+    soft_saving_paise bigint DEFAULT '0'::bigint NOT NULL,
+    saving_basis text,
+    intangible_stars jsonb,
+    investment_paise bigint DEFAULT '0'::bigint NOT NULL,
+    investment_is_estimate boolean DEFAULT true NOT NULL,
+    needs_shutdown boolean DEFAULT false NOT NULL,
+    priority_score integer DEFAULT 0 NOT NULL,
+    priority_verdict character varying(8),
+    score_components jsonb,
+    provisional boolean DEFAULT false NOT NULL,
+    provisional_note text,
+    safety_flagged boolean DEFAULT false NOT NULL,
+    approval_step integer DEFAULT 0 NOT NULL,
+    approval_route jsonb,
+    approval_trail jsonb,
+    duplicate_action_id uuid,
+    duplicate_of_id uuid,
+    is_recurrence boolean DEFAULT false NOT NULL,
+    promoted_from_id uuid,
+    implemented_at timestamp with time zone,
+    verified_saving_paise bigint DEFAULT '0'::bigint NOT NULL,
+    verified_at timestamp with time zone,
+    points_awarded integer DEFAULT 0 NOT NULL,
+    signals character varying(32)[]
+);
+
+ALTER TABLE ONLY public.kaizen_ideas FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: kaizen_patterns; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.kaizen_patterns (
+    id uuid NOT NULL,
+    label character varying(300) NOT NULL,
+    signature character varying(48)[],
+    idea_ids uuid[],
+    downtime_event_ids uuid[],
+    departments character varying(64)[],
+    kaizen_count integer DEFAULT 0 NOT NULL,
+    event_count integer DEFAULT 0 NOT NULL,
+    verified_cost_paise bigint DEFAULT '0'::bigint NOT NULL,
+    lost_minutes integer DEFAULT 0 NOT NULL,
+    recommendation text,
+    action_id uuid,
+    dismissed boolean DEFAULT false NOT NULL,
+    detected_on date NOT NULL,
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.kaizen_patterns FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: kaizen_points; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.kaizen_points (
+    id uuid NOT NULL,
+    idea_id uuid NOT NULL,
+    operator_id uuid,
+    person_name character varying(200) NOT NULL,
+    board character varying(16) DEFAULT 'shopfloor'::character varying NOT NULL,
+    kind character varying(24) NOT NULL,
+    points integer NOT NULL,
+    awarded_on date NOT NULL,
+    note character varying(300),
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.kaizen_points FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: kaizen_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.kaizen_settings (
+    id uuid NOT NULL,
+    template character varying(12) DEFAULT 'simple'::character varying NOT NULL,
+    steps jsonb,
+    auto_approve_below_paise bigint DEFAULT '500000'::bigint NOT NULL,
+    auto_approve_min_score integer DEFAULT 80 NOT NULL,
+    safety_always_to_owner boolean DEFAULT true NOT NULL,
+    finance_above_paise bigint DEFAULT '2500000'::bigint NOT NULL,
+    history_window_days integer DEFAULT 180 NOT NULL,
+    score_weights jsonb,
+    pattern_min_items integer DEFAULT 5 NOT NULL,
+    pattern_min_value_paise bigint DEFAULT '5000000'::bigint NOT NULL,
+    patterns_include_quick boolean DEFAULT true NOT NULL,
+    promote_above_paise bigint DEFAULT '2000000'::bigint NOT NULL,
+    monthly_minimum integer DEFAULT 1 NOT NULL,
+    quick_win_investment_paise bigint DEFAULT '1000000'::bigint NOT NULL,
+    enabled_categories character varying(20)[],
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.kaizen_settings FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -431,6 +649,8 @@ CREATE TABLE public.lots (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.lots FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: margin_band_values; Type: TABLE; Schema: public; Owner: -
@@ -445,6 +665,30 @@ CREATE TABLE public.margin_band_values (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.margin_band_values FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: material_stagings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.material_stagings (
+    id uuid NOT NULL,
+    job_order_id uuid NOT NULL,
+    business_date date NOT NULL,
+    status character varying(12) NOT NULL,
+    quantity_required integer,
+    quantity_staged integer,
+    note text,
+    confirmed_by_id uuid,
+    confirmed_at timestamp with time zone,
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.material_stagings FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -471,6 +715,42 @@ CREATE TABLE public.memory_entries (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.memory_entries FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: notifications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notifications (
+    id uuid NOT NULL,
+    kind character varying(32) NOT NULL,
+    channel character varying(12) NOT NULL,
+    status character varying(12) NOT NULL,
+    recipient_name character varying(200),
+    recipient_number character varying(20),
+    user_id uuid,
+    title character varying(200),
+    body text NOT NULL,
+    url character varying(300),
+    template character varying(64),
+    variables jsonb,
+    subject_type character varying(32),
+    subject_id uuid,
+    dedupe_key character varying(160),
+    attempts bigint DEFAULT '0'::bigint NOT NULL,
+    next_attempt_at timestamp with time zone,
+    last_error text,
+    provider_message_id character varying(128),
+    provider_response jsonb,
+    sent_at timestamp with time zone,
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.notifications FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: operator_skills; Type: TABLE; Schema: public; Owner: -
@@ -489,6 +769,8 @@ CREATE TABLE public.operator_skills (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.operator_skills FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: operators; Type: TABLE; Schema: public; Owner: -
@@ -504,6 +786,8 @@ CREATE TABLE public.operators (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.operators FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -522,8 +806,11 @@ CREATE TABLE public.parts (
     is_active boolean NOT NULL,
     plant_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    weight_kg numeric(10,3)
 );
+
+ALTER TABLE ONLY public.parts FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -550,7 +837,9 @@ CREATE TABLE public.plants (
     monthly_fee bigint NOT NULL,
     is_active boolean NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    action_due_days integer DEFAULT 3 NOT NULL,
+    working_days_per_year integer DEFAULT 300 NOT NULL
 );
 
 
@@ -573,8 +862,11 @@ CREATE TABLE public.production_counts (
     plant_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    client_ref character varying(64),
     CONSTRAINT ck_production_count_nonneg CHECK ((count >= 0))
 );
+
+ALTER TABLE ONLY public.production_counts FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -592,6 +884,29 @@ CREATE TABLE public.production_targets (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.production_targets FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: push_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.push_subscriptions (
+    id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    endpoint text NOT NULL,
+    p256dh character varying(200) NOT NULL,
+    auth character varying(100) NOT NULL,
+    user_agent character varying(300),
+    failures bigint DEFAULT '0'::bigint NOT NULL,
+    last_success_at timestamp with time zone,
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.push_subscriptions FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -630,9 +945,12 @@ CREATE TABLE public.quality_records (
     snapshot_bottleneck_factor numeric(3,2) NOT NULL,
     snapshot_costing_mode character varying(16) NOT NULL,
     formula_version integer NOT NULL,
+    client_ref character varying(64),
     CONSTRAINT ck_quality_nonneg CHECK (((good_count >= 0) AND (reject_count >= 0))),
-    CONSTRAINT ck_quality_scrap_xor_rework CHECK ((NOT (((disposition)::text = 'scrap'::text) AND (rework_count > 0))))
+    CONSTRAINT ck_quality_rework_nonneg CHECK ((rework_count >= 0))
 );
+
+ALTER TABLE ONLY public.quality_records FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -677,6 +995,8 @@ CREATE TABLE public.reason_codes (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.reason_codes FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: recovered_profit_entries; Type: TABLE; Schema: public; Owner: -
@@ -695,6 +1015,8 @@ CREATE TABLE public.recovered_profit_entries (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.recovered_profit_entries FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -718,6 +1040,8 @@ CREATE TABLE public.root_cause_analyses (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.root_cause_analyses FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: routing_operations; Type: TABLE; Schema: public; Owner: -
@@ -737,6 +1061,8 @@ CREATE TABLE public.routing_operations (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.routing_operations FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -762,6 +1088,8 @@ CREATE TABLE public.shift_sessions (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.shift_sessions FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: shifts; Type: TABLE; Schema: public; Owner: -
@@ -780,6 +1108,8 @@ CREATE TABLE public.shifts (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.shifts FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -801,6 +1131,8 @@ CREATE TABLE public.stage_completions (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.stage_completions FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -824,6 +1156,36 @@ CREATE TABLE public.stations (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.stations FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: sync_holds; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sync_holds (
+    id uuid NOT NULL,
+    client_ref character varying(64) NOT NULL,
+    device_id character varying(64),
+    kind character varying(24) NOT NULL,
+    shift_session_id uuid,
+    business_date date,
+    occurred_at timestamp with time zone NOT NULL,
+    payload jsonb NOT NULL,
+    reason text NOT NULL,
+    submitted_by_id uuid,
+    status character varying(12) NOT NULL,
+    resolution_note text,
+    resolved_by_id uuid,
+    resolved_at timestamp with time zone,
+    entity_id uuid,
+    plant_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE ONLY public.sync_holds FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: template_uploads; Type: TABLE; Schema: public; Owner: -
@@ -846,6 +1208,8 @@ CREATE TABLE public.template_uploads (
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+ALTER TABLE ONLY public.template_uploads FORCE ROW LEVEL SECURITY;
+
 
 --
 -- Name: training_needs; Type: TABLE; Schema: public; Owner: -
@@ -865,6 +1229,8 @@ CREATE TABLE public.training_needs (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+ALTER TABLE ONLY public.training_needs FORCE ROW LEVEL SECURITY;
 
 
 --
@@ -937,6 +1303,14 @@ ALTER TABLE ONLY public.alembic_version
 
 ALTER TABLE ONLY public.alert_recipients
     ADD CONSTRAINT alert_recipients_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: attachments attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attachments
+    ADD CONSTRAINT attachments_pkey PRIMARY KEY (id);
 
 
 --
@@ -1076,11 +1450,43 @@ ALTER TABLE ONLY public.job_sessions
 
 
 --
+-- Name: kaizen_category_codes kaizen_category_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_category_codes
+    ADD CONSTRAINT kaizen_category_codes_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: kaizen_ideas kaizen_ideas_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.kaizen_ideas
     ADD CONSTRAINT kaizen_ideas_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: kaizen_patterns kaizen_patterns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_patterns
+    ADD CONSTRAINT kaizen_patterns_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: kaizen_points kaizen_points_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_points
+    ADD CONSTRAINT kaizen_points_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: kaizen_settings kaizen_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_settings
+    ADD CONSTRAINT kaizen_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -1116,11 +1522,27 @@ ALTER TABLE ONLY public.margin_band_values
 
 
 --
+-- Name: material_stagings material_stagings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.material_stagings
+    ADD CONSTRAINT material_stagings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: memory_entries memory_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.memory_entries
     ADD CONSTRAINT memory_entries_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
 
 
 --
@@ -1201,6 +1623,14 @@ ALTER TABLE ONLY public.production_counts
 
 ALTER TABLE ONLY public.production_targets
     ADD CONSTRAINT production_targets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: push_subscriptions push_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id);
 
 
 --
@@ -1340,6 +1770,14 @@ ALTER TABLE ONLY public.stations
 
 
 --
+-- Name: sync_holds sync_holds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sync_holds
+    ADD CONSTRAINT sync_holds_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: template_uploads template_uploads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1353,6 +1791,62 @@ ALTER TABLE ONLY public.template_uploads
 
 ALTER TABLE ONLY public.training_needs
     ADD CONSTRAINT training_needs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: kaizen_category_codes uq_kaizen_category_codes; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_category_codes
+    ADD CONSTRAINT uq_kaizen_category_codes UNIQUE (plant_id, category, reason_code_id, defect_code_id);
+
+
+--
+-- Name: kaizen_ideas uq_kaizen_ideas_reference; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT uq_kaizen_ideas_reference UNIQUE (plant_id, reference);
+
+
+--
+-- Name: kaizen_points uq_kaizen_points_once; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_points
+    ADD CONSTRAINT uq_kaizen_points_once UNIQUE (plant_id, idea_id, kind);
+
+
+--
+-- Name: kaizen_settings uq_kaizen_settings_plant; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_settings
+    ADD CONSTRAINT uq_kaizen_settings_plant UNIQUE (plant_id);
+
+
+--
+-- Name: notifications uq_notifications_dedupe; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT uq_notifications_dedupe UNIQUE (plant_id, dedupe_key);
+
+
+--
+-- Name: push_subscriptions uq_push_subscriptions_plant_endpoint; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT uq_push_subscriptions_plant_endpoint UNIQUE (plant_id, endpoint);
+
+
+--
+-- Name: sync_holds uq_sync_holds_client_ref; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sync_holds
+    ADD CONSTRAINT uq_sync_holds_client_ref UNIQUE (plant_id, client_ref);
 
 
 --
@@ -1463,6 +1957,20 @@ CREATE INDEX ix_alert_recipients_plant ON public.alert_recipients USING btree (p
 --
 
 CREATE INDEX ix_alert_recipients_plant_id ON public.alert_recipients USING btree (plant_id);
+
+
+--
+-- Name: ix_attachments_entity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_attachments_entity ON public.attachments USING btree (plant_id, entity_type, entity_id);
+
+
+--
+-- Name: ix_attachments_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_attachments_plant_id ON public.attachments USING btree (plant_id);
 
 
 --
@@ -1669,6 +2177,13 @@ CREATE INDEX ix_escalations_plant_id ON public.escalations USING btree (plant_id
 
 
 --
+-- Name: ix_escalations_route; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_escalations_route ON public.escalations USING btree (plant_id, route);
+
+
+--
 -- Name: ix_job_orders_part_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1725,10 +2240,38 @@ CREATE INDEX ix_job_sessions_station_open ON public.job_sessions USING btree (pl
 
 
 --
+-- Name: ix_kaizen_category_codes_cat; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_category_codes_cat ON public.kaizen_category_codes USING btree (plant_id, category);
+
+
+--
+-- Name: ix_kaizen_category_codes_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_category_codes_plant_id ON public.kaizen_category_codes USING btree (plant_id);
+
+
+--
 -- Name: ix_kaizen_ideas_action_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX ix_kaizen_ideas_action_id ON public.kaizen_ideas USING btree (action_id);
+
+
+--
+-- Name: ix_kaizen_ideas_credited_operator_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_ideas_credited_operator_id ON public.kaizen_ideas USING btree (credited_operator_id);
+
+
+--
+-- Name: ix_kaizen_ideas_part_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_ideas_part_id ON public.kaizen_ideas USING btree (part_id);
 
 
 --
@@ -1739,10 +2282,80 @@ CREATE INDEX ix_kaizen_ideas_plant_id ON public.kaizen_ideas USING btree (plant_
 
 
 --
+-- Name: ix_kaizen_ideas_reason_code_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_ideas_reason_code_id ON public.kaizen_ideas USING btree (reason_code_id);
+
+
+--
 -- Name: ix_kaizen_ideas_station_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX ix_kaizen_ideas_station_id ON public.kaizen_ideas USING btree (station_id);
+
+
+--
+-- Name: ix_kaizen_ideas_submitted_on; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_ideas_submitted_on ON public.kaizen_ideas USING btree (submitted_on);
+
+
+--
+-- Name: ix_kaizen_month; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_month ON public.kaizen_ideas USING btree (plant_id, submitted_on);
+
+
+--
+-- Name: ix_kaizen_patterns_open; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_patterns_open ON public.kaizen_patterns USING btree (plant_id, dismissed);
+
+
+--
+-- Name: ix_kaizen_patterns_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_patterns_plant_id ON public.kaizen_patterns USING btree (plant_id);
+
+
+--
+-- Name: ix_kaizen_points_idea_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_points_idea_id ON public.kaizen_points USING btree (idea_id);
+
+
+--
+-- Name: ix_kaizen_points_person; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_points_person ON public.kaizen_points USING btree (plant_id, board, person_name);
+
+
+--
+-- Name: ix_kaizen_points_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_points_plant_id ON public.kaizen_points USING btree (plant_id);
+
+
+--
+-- Name: ix_kaizen_priority; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_priority ON public.kaizen_ideas USING btree (plant_id, status, priority_score);
+
+
+--
+-- Name: ix_kaizen_settings_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_kaizen_settings_plant_id ON public.kaizen_settings USING btree (plant_id);
 
 
 --
@@ -1771,6 +2384,27 @@ CREATE INDEX ix_lots_plant_id ON public.lots USING btree (plant_id);
 --
 
 CREATE INDEX ix_margin_band_values_plant_id ON public.margin_band_values USING btree (plant_id);
+
+
+--
+-- Name: ix_material_staging_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_material_staging_date ON public.material_stagings USING btree (plant_id, business_date, status);
+
+
+--
+-- Name: ix_material_stagings_job_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_material_stagings_job_order_id ON public.material_stagings USING btree (job_order_id);
+
+
+--
+-- Name: ix_material_stagings_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_material_stagings_plant_id ON public.material_stagings USING btree (plant_id);
 
 
 --
@@ -1806,6 +2440,20 @@ CREATE INDEX ix_memory_fts ON public.memory_entries USING gin (to_tsvector('engl
 --
 
 CREATE INDEX ix_memory_search ON public.memory_entries USING btree (plant_id, created_at);
+
+
+--
+-- Name: ix_notifications_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_notifications_due ON public.notifications USING btree (plant_id, status, next_attempt_at);
+
+
+--
+-- Name: ix_notifications_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_notifications_plant_id ON public.notifications USING btree (plant_id);
 
 
 --
@@ -1897,6 +2545,13 @@ CREATE INDEX ix_production_targets_plant ON public.production_targets USING btre
 --
 
 CREATE INDEX ix_production_targets_plant_id ON public.production_targets USING btree (plant_id);
+
+
+--
+-- Name: ix_push_subscriptions_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_push_subscriptions_plant_id ON public.push_subscriptions USING btree (plant_id);
 
 
 --
@@ -2068,6 +2723,20 @@ CREATE INDEX ix_stations_plant_id ON public.stations USING btree (plant_id);
 
 
 --
+-- Name: ix_sync_holds_plant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_sync_holds_plant_id ON public.sync_holds USING btree (plant_id);
+
+
+--
+-- Name: ix_sync_holds_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_sync_holds_status ON public.sync_holds USING btree (plant_id, status);
+
+
+--
 -- Name: ix_template_uploads_plant; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2117,10 +2786,38 @@ CREATE INDEX ix_user_plant_roles_user_id ON public.user_plant_roles USING btree 
 
 
 --
+-- Name: uq_downtime_events_client_ref; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_downtime_events_client_ref ON public.downtime_events USING btree (plant_id, client_ref) WHERE (client_ref IS NOT NULL);
+
+
+--
+-- Name: uq_material_staging_job_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_material_staging_job_date ON public.material_stagings USING btree (plant_id, job_order_id, business_date);
+
+
+--
 -- Name: uq_one_open_downtime_per_station; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX uq_one_open_downtime_per_station ON public.downtime_events USING btree (station_id) WHERE ((status)::text = 'open'::text);
+
+
+--
+-- Name: uq_production_counts_client_ref; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_production_counts_client_ref ON public.production_counts USING btree (plant_id, client_ref) WHERE (client_ref IS NOT NULL);
+
+
+--
+-- Name: uq_quality_records_client_ref; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_quality_records_client_ref ON public.quality_records USING btree (plant_id, client_ref) WHERE (client_ref IS NOT NULL);
 
 
 --
@@ -2193,6 +2890,22 @@ ALTER TABLE ONLY public.alert_recipients
 
 ALTER TABLE ONLY public.alert_recipients
     ADD CONSTRAINT alert_recipients_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: attachments attachments_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attachments
+    ADD CONSTRAINT attachments_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: attachments attachments_uploaded_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attachments
+    ADD CONSTRAINT attachments_uploaded_by_id_fkey FOREIGN KEY (uploaded_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -2380,6 +3093,86 @@ ALTER TABLE ONLY public.escalations
 
 
 --
+-- Name: actions fk_actions_part; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.actions
+    ADD CONSTRAINT fk_actions_part FOREIGN KEY (part_id) REFERENCES public.parts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: downtime_events fk_downtime_repaired_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.downtime_events
+    ADD CONSTRAINT fk_downtime_repaired_by FOREIGN KEY (repaired_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: escalations fk_escalations_acknowledged_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.escalations
+    ADD CONSTRAINT fk_escalations_acknowledged_by FOREIGN KEY (acknowledged_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_ideas fk_kaizen_defect_code; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT fk_kaizen_defect_code FOREIGN KEY (defect_code_id) REFERENCES public.defect_codes(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_ideas fk_kaizen_duplicate_action; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT fk_kaizen_duplicate_action FOREIGN KEY (duplicate_action_id) REFERENCES public.actions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_ideas fk_kaizen_duplicate_of; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT fk_kaizen_duplicate_of FOREIGN KEY (duplicate_of_id) REFERENCES public.kaizen_ideas(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_ideas fk_kaizen_job_order; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT fk_kaizen_job_order FOREIGN KEY (job_order_id) REFERENCES public.job_orders(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_ideas fk_kaizen_part; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT fk_kaizen_part FOREIGN KEY (part_id) REFERENCES public.parts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_ideas fk_kaizen_promoted_from; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT fk_kaizen_promoted_from FOREIGN KEY (promoted_from_id) REFERENCES public.kaizen_ideas(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_ideas fk_kaizen_user; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_ideas
+    ADD CONSTRAINT fk_kaizen_user FOREIGN KEY (submitted_by_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: job_orders job_orders_part_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2460,6 +3253,30 @@ ALTER TABLE ONLY public.job_sessions
 
 
 --
+-- Name: kaizen_category_codes kaizen_category_codes_defect_code_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_category_codes
+    ADD CONSTRAINT kaizen_category_codes_defect_code_id_fkey FOREIGN KEY (defect_code_id) REFERENCES public.defect_codes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: kaizen_category_codes kaizen_category_codes_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_category_codes
+    ADD CONSTRAINT kaizen_category_codes_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: kaizen_category_codes kaizen_category_codes_reason_code_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_category_codes
+    ADD CONSTRAINT kaizen_category_codes_reason_code_id_fkey FOREIGN KEY (reason_code_id) REFERENCES public.reason_codes(id) ON DELETE CASCADE;
+
+
+--
 -- Name: kaizen_ideas kaizen_ideas_action_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2496,7 +3313,55 @@ ALTER TABLE ONLY public.kaizen_ideas
 --
 
 ALTER TABLE ONLY public.kaizen_ideas
-    ADD CONSTRAINT kaizen_ideas_submitted_by_operator_id_fkey FOREIGN KEY (submitted_by_operator_id) REFERENCES public.operators(id) ON DELETE SET NULL;
+    ADD CONSTRAINT kaizen_ideas_submitted_by_operator_id_fkey FOREIGN KEY (credited_operator_id) REFERENCES public.operators(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_patterns kaizen_patterns_action_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_patterns
+    ADD CONSTRAINT kaizen_patterns_action_id_fkey FOREIGN KEY (action_id) REFERENCES public.actions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_patterns kaizen_patterns_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_patterns
+    ADD CONSTRAINT kaizen_patterns_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: kaizen_points kaizen_points_idea_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_points
+    ADD CONSTRAINT kaizen_points_idea_id_fkey FOREIGN KEY (idea_id) REFERENCES public.kaizen_ideas(id) ON DELETE CASCADE;
+
+
+--
+-- Name: kaizen_points kaizen_points_operator_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_points
+    ADD CONSTRAINT kaizen_points_operator_id_fkey FOREIGN KEY (operator_id) REFERENCES public.operators(id) ON DELETE SET NULL;
+
+
+--
+-- Name: kaizen_points kaizen_points_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_points
+    ADD CONSTRAINT kaizen_points_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: kaizen_settings kaizen_settings_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.kaizen_settings
+    ADD CONSTRAINT kaizen_settings_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
 
 
 --
@@ -2521,6 +3386,30 @@ ALTER TABLE ONLY public.lots
 
 ALTER TABLE ONLY public.margin_band_values
     ADD CONSTRAINT margin_band_values_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: material_stagings material_stagings_confirmed_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.material_stagings
+    ADD CONSTRAINT material_stagings_confirmed_by_id_fkey FOREIGN KEY (confirmed_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: material_stagings material_stagings_job_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.material_stagings
+    ADD CONSTRAINT material_stagings_job_order_id_fkey FOREIGN KEY (job_order_id) REFERENCES public.job_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: material_stagings material_stagings_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.material_stagings
+    ADD CONSTRAINT material_stagings_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
 
 
 --
@@ -2561,6 +3450,22 @@ ALTER TABLE ONLY public.memory_entries
 
 ALTER TABLE ONLY public.memory_entries
     ADD CONSTRAINT memory_entries_station_id_fkey FOREIGN KEY (station_id) REFERENCES public.stations(id) ON DELETE SET NULL;
+
+
+--
+-- Name: notifications notifications_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: notifications notifications_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -2665,6 +3570,22 @@ ALTER TABLE ONLY public.production_targets
 
 ALTER TABLE ONLY public.production_targets
     ADD CONSTRAINT production_targets_station_id_fkey FOREIGN KEY (station_id) REFERENCES public.stations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: push_subscriptions push_subscriptions_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: push_subscriptions push_subscriptions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2900,6 +3821,38 @@ ALTER TABLE ONLY public.stations
 
 
 --
+-- Name: sync_holds sync_holds_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sync_holds
+    ADD CONSTRAINT sync_holds_plant_id_fkey FOREIGN KEY (plant_id) REFERENCES public.plants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sync_holds sync_holds_resolved_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sync_holds
+    ADD CONSTRAINT sync_holds_resolved_by_id_fkey FOREIGN KEY (resolved_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sync_holds sync_holds_shift_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sync_holds
+    ADD CONSTRAINT sync_holds_shift_session_id_fkey FOREIGN KEY (shift_session_id) REFERENCES public.shift_sessions(id) ON DELETE SET NULL;
+
+
+--
+-- Name: sync_holds sync_holds_submitted_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sync_holds
+    ADD CONSTRAINT sync_holds_submitted_by_id_fkey FOREIGN KEY (submitted_by_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: template_uploads template_uploads_plant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2982,6 +3935,12 @@ ALTER TABLE public.actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alert_recipients ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: attachments; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.attachments ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: audit_log; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -3060,10 +4019,34 @@ ALTER TABLE public.job_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.job_sessions ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: kaizen_category_codes; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.kaizen_category_codes ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: kaizen_ideas; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.kaizen_ideas ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: kaizen_patterns; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.kaizen_patterns ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: kaizen_points; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.kaizen_points ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: kaizen_settings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.kaizen_settings ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: lots; Type: ROW SECURITY; Schema: public; Owner: -
@@ -3078,10 +4061,22 @@ ALTER TABLE public.lots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.margin_band_values ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: material_stagings; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.material_stagings ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: memory_entries; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.memory_entries ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: notifications; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: operator_skills; Type: ROW SECURITY; Schema: public; Owner: -
@@ -3105,252 +4100,315 @@ ALTER TABLE public.parts ENABLE ROW LEVEL SECURITY;
 -- Name: action_events plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.action_events USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.action_events USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: actions plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.actions USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.actions USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: alert_recipients plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.alert_recipients USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.alert_recipients USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: attachments plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.attachments USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: audit_log plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.audit_log USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.audit_log USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: audit_packs plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.audit_packs USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.audit_packs USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: coach_briefings plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.coach_briefings USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.coach_briefings USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: compliance_clauses plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.compliance_clauses USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.compliance_clauses USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: copilot_queries plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.copilot_queries USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.copilot_queries USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: cost_families plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.cost_families USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.cost_families USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: cost_rates plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.cost_rates USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.cost_rates USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: defect_codes plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.defect_codes USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.defect_codes USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: dispatch_records plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.dispatch_records USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.dispatch_records USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: downtime_events plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.downtime_events USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.downtime_events USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: escalations plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.escalations USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.escalations USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: job_orders plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.job_orders USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.job_orders USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: job_sessions plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.job_sessions USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.job_sessions USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: kaizen_category_codes plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.kaizen_category_codes USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: kaizen_ideas plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.kaizen_ideas USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.kaizen_ideas USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: kaizen_patterns plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.kaizen_patterns USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: kaizen_points plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.kaizen_points USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: kaizen_settings plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.kaizen_settings USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: lots plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.lots USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.lots USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: margin_band_values plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.margin_band_values USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.margin_band_values USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: material_stagings plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.material_stagings USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: memory_entries plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.memory_entries USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.memory_entries USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: notifications plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.notifications USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: operator_skills plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.operator_skills USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.operator_skills USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: operators plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.operators USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.operators USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: parts plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.parts USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.parts USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: production_counts plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.production_counts USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.production_counts USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: production_targets plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.production_targets USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.production_targets USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: push_subscriptions plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.push_subscriptions USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: quality_records plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.quality_records USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.quality_records USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: reason_codes plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.reason_codes USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.reason_codes USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: recovered_profit_entries plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.recovered_profit_entries USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.recovered_profit_entries USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: root_cause_analyses plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.root_cause_analyses USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.root_cause_analyses USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: routing_operations plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.routing_operations USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.routing_operations USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: shift_sessions plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.shift_sessions USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.shift_sessions USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: shifts plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.shifts USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.shifts USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: stage_completions plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.stage_completions USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.stage_completions USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: stations plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.stations USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.stations USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
+
+
+--
+-- Name: sync_holds plant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY plant_isolation ON public.sync_holds USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: template_uploads plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.template_uploads USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.template_uploads USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
 -- Name: training_needs plant_isolation; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY plant_isolation ON public.training_needs USING (((current_setting('app.current_plant'::text, true) IS NULL) OR (current_setting('app.current_plant'::text, true) = ''::text) OR ((plant_id)::text = current_setting('app.current_plant'::text, true))));
+CREATE POLICY plant_isolation ON public.training_needs USING (((plant_id)::text = current_setting('app.current_plant'::text, true))) WITH CHECK (((plant_id)::text = current_setting('app.current_plant'::text, true)));
 
 
 --
@@ -3364,6 +4422,12 @@ ALTER TABLE public.production_counts ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.production_targets ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: push_subscriptions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: quality_records; Type: ROW SECURITY; Schema: public; Owner: -
@@ -3420,6 +4484,12 @@ ALTER TABLE public.stage_completions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stations ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: sync_holds; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sync_holds ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: template_uploads; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -3435,6 +4505,10 @@ ALTER TABLE public.training_needs ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
+\unrestrict Ce18OGkUt78BFlxPAxcR7yEJhEznwH8ElCZ5RPvc8EE9tChXPOfebcwRp6tlr4c
 
+
+--
 -- Stamp the revision so a later 'alembic upgrade head' is a no-op.
-INSERT INTO public.alembic_version (version_num) VALUES ('0ba4b6bb4343');
+--
+INSERT INTO public.alembic_version (version_num) VALUES ('9f3c2d6e8a41');
