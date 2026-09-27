@@ -8,12 +8,12 @@ told the one action that recovers the most.
 
 Built from `FactoryManager_AI_Product_Specification_v5 - 08.09.2026.pdf`
 (42pp, Sections 1–16). Where the spec left a decision open, the choice and its
-reasoning are in [`ARCHITECTURE.md`](ARCHITECTURE.md) and
-[`docs/DECISIONS.md`](docs/DECISIONS.md).
+reasoning are in [`ARCHITECTURE.md`](prd-files/ARCHITECTURE.md) and
+[`DECISIONS.md`](prd-files/DECISIONS.md).
 
 ---
 
-> **Running it:** see [`RUNNING.md`](RUNNING.md) for the full set of commands,
+> **Running it:** see [`RUNNING.md`](prd-files/RUNNING.md) for the full set of commands,
 > troubleshooting, and the optional LLM/MQTT services.
 
 ## Quick start
@@ -102,7 +102,7 @@ budget should not be spent on navigation.
 | ML | scikit-learn / XGBoost / PyTorch (Coach tiers 2–3) |
 
 Two substitutions from the stack as specified, both documented in
-[`docs/DECISIONS.md`](docs/DECISIONS.md):
+[`DECISIONS.md`](prd-files/DECISIONS.md):
 
 - **psycopg3 instead of asyncpg** — one driver serves both the async app and
   Alembic's synchronous migrations.
@@ -180,15 +180,16 @@ Four things this build does **not** yet do safely:
    it. The ladder runs without it and stays timestamped; it just reaches fewer
    phones.
 4. **Decide the open items in §16.5** — they have defaults, and the defaults are
-   listed in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+   listed in [`DECISIONS.md`](prd-files/DECISIONS.md).
 
 ---
 
 ## Documentation
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — data model, calculation architecture, tenancy, AI grounding
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — what was decided while building, and why
-- [`docs/API.md`](docs/API.md) — endpoints, auth, the WebSocket protocol
+- [`ARCHITECTURE.md`](prd-files/ARCHITECTURE.md) — data model, calculation architecture, tenancy, AI grounding
+- [`DECISIONS.md`](prd-files/DECISIONS.md) — what was decided while building, and why
+- [`API.md`](prd-files/API.md) — endpoints, auth, the WebSocket protocol
 - [`infra/emqx/README.md`](infra/emqx/README.md) — the sensor seam
-- [`IMPLEMENTATION-ROADMAP.md`](IMPLEMENTATION-ROADMAP.md) — the 30-week plan
-- [`CRITICAL-DECISIONS-AND-RISKS.md`](CRITICAL-DECISIONS-AND-RISKS.md) — risk register
+- [`IMPLEMENTATION-ROADMAP.md`](prd-files/IMPLEMENTATION-ROADMAP.md) — the 30-week plan
+- [`CRITICAL-DECISIONS-AND-RISKS.md`](prd-files/CRITICAL-DECISIONS-AND-RISKS.md) — risk register
+# factory-head

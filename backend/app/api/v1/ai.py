@@ -88,12 +88,15 @@ async def ask(
     plant: Plant = Depends(get_plant),
     session: AsyncSession = Depends(get_session),
 ):
-    """Ask anything, in English or Tamil, and get an answer from your own data.
+    """Ask anything, in English, Tamil or Hindi, and get an answer from your own data.
 
-    Factual questions work from day one. Pattern questions are withheld until
-    enough events exist to support them — and the refusal is explicit, because
-    "I've seen 2 events like this; I'll give you pattern analysis once I've seen
-    more" keeps trust, while a confident guess destroys it.
+    Factual questions work from day one, and so do questions about the company
+    itself — what it makes, for whom, on how many machines — which come from
+    the setup data rather than from anywhere outside this plant. Pattern
+    questions are withheld until enough events exist to support them, and the
+    refusal is explicit, because "I've seen 2 events like this; I'll give you
+    pattern analysis once I've seen more" keeps trust while a confident guess
+    destroys it.
     """
     answer = await copilot_service.ask(
         session,
@@ -104,6 +107,43 @@ async def ask(
         channel="web",
         as_of=plant_today(plant),
     )
+    return _copilot_out(answer)
+
+
+@router.post("/copilot/rephrase", response_model=CopilotResponse)
+async def rephrase(
+    payload: CopilotRequest,
+    identity: Identity = Depends(get_identity),
+    plant: Plant = Depends(get_plant),
+    session: AsyncSession = Depends(get_session),
+):
+    """The same question, read back in another language.
+
+    Switching the Ask screen to Hindi has to carry the conversation already on
+    it, not just the buttons around it — an English answer sitting under a
+    Hindi heading is the product saying it translated something it did not.
+    The answer is rebuilt from the same facts rather than translated as text,
+    which is the only way the rupee figures in it stay the ones the kernel
+    produced.
+
+    Deliberately not logged as a query. The plant asked once; a supervisor
+    changing the language is re-reading that answer, and counting it twice
+    would inflate every usage figure drawn from the Copilot log.
+    """
+    answer = await copilot_service.ask(
+        session,
+        plant=plant,
+        question=payload.question,
+        user_id=identity.user.id,
+        language=payload.language,
+        channel="web",
+        as_of=plant_today(plant),
+        record=False,
+    )
+    return _copilot_out(answer)
+
+
+def _copilot_out(answer: copilot_service.CopilotAnswer) -> CopilotResponse:
     return CopilotResponse(
         answer=answer.answer,
         intent=answer.intent,

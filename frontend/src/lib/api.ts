@@ -19,6 +19,7 @@ import type {
   NotificationLog, OnboardingDefaults, PushPublicKey, QualityCorrection, ShiftEntries,
   ShiftEntryProduction, SyncHold, SyncOpIn, SyncResult,
 } from "@/types/api";
+import type { Language } from "@/lib/i18n/languages";
 import { reportRequest } from "@/lib/offline/status";
 
 const BASE = "/api/v1";
@@ -380,8 +381,14 @@ export const api = {
     }
   },
   generateCoach: () => post<CoachBriefing>("/ai/coach/generate"),
-  ask: (question: string, language: "en" | "ta" = "en") =>
+  ask: (question: string, language: Language = "en") =>
     post<CopilotAnswer>("/ai/copilot/ask", { question, language }),
+  // The same question, read back in another language. It is a separate route
+  // because it is not a second question: the server rebuilds the answer from
+  // the same facts and does not log it again, so switching the Ask screen to
+  // Hindi mid-conversation does not double the plant's usage figures.
+  rephrase: (question: string, language: Language) =>
+    post<CopilotAnswer>("/ai/copilot/rephrase", { question, language }),
 
   // --- onboarding ---------------------------------------------------------
   readinessQuestions: () =>

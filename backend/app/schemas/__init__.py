@@ -827,7 +827,10 @@ class CoachBriefingOut(BaseModel):
 
 class CopilotRequest(BaseModel):
     question: str = Field(min_length=2, max_length=500)
-    language: Literal["en", "ta"] = "en"
+    #: The language the *answer* comes back in. It is not a guess at what the
+    #: question was typed in: a supervisor reading Hindi still names machines
+    #: and reason codes in the English the plant's records use.
+    language: Literal["en", "ta", "hi"] = "en"
 
 
 class CopilotResponse(BaseModel):

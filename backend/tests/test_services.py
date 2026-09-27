@@ -735,6 +735,190 @@ async def test_ask_refuses_to_answer_when_the_database_has_no_fact_bundle():
     assert answered_by == "deterministic"
 
 
+async def test_a_question_about_the_company_is_answered_from_its_own_setup_data(
+    session, fixtures
+):
+    """§3 Layer 3 — "anyone in the plant can ask a question in plain language".
+
+    "What do we make, and for whom?" is not a loss figure, but it is not an
+    outside question either: every line of the answer is the plant's own
+    onboarding data (§15, templates T1-T7). Refusing it as off-topic was the
+    product being obtuse about its own records, and a supervisor told to ask
+    "professional or core-based questions" instead learns to stop asking.
+    """
+    from app.ai.copilot import _answer, _is_off_topic
+    from app.ai.facts import build_question_facts
+
+    plant = fixtures["plant"]
+    as_of = NOW.date()
+
+    for question in (
+        "What is our company name?",
+        "Who are our customers?",
+        "How many machines do we have?",
+        # Typed in the language the picker just offered, which is how it will
+        # actually be typed once somebody switches the screen to Hindi.
+        "हमारी कंपनी क्या बनाती है?",
+    ):
+        _, intent = await build_question_facts(
+            session, plant=plant, question=question, as_of=as_of
+        )
+        assert intent == "company", question
+        assert not _is_off_topic(question), question
+
+    # Asked about customers, answered about customers. Reading back the machine
+    # count, the shift pattern and the working-day calendar as well is the same
+    # confidently-irrelevant reply the memory branch exists to avoid.
+    bundle, _ = await build_question_facts(
+        session, plant=plant, question="Who are our customers?", as_of=as_of
+    )
+    assert bundle.facts["company_name"] == plant.name
+    assert bundle.facts["customers"] == "Rane TRW"
+    assert "machines" not in bundle.facts
+
+    counted, _ = await build_question_facts(
+        session, plant=plant, question="How many machines do we have?", as_of=as_of
+    )
+    assert counted.facts["machines"] == 1
+    assert "customers" not in counted.facts
+
+    # A question with no particular aspect to it gets the whole profile, shift
+    # pattern included as evidence that can be checked against the board on the
+    # wall rather than taken on trust.
+    whole, _ = await build_question_facts(
+        session, plant=plant, question="Tell me about the company", as_of=as_of
+    )
+    assert whole.facts["machines"] == 1
+    assert whole.evidence[0]["shift"] == "Shift A"
+
+    answer, answered_by = await _answer(
+        bundle=bundle,
+        question="Who are our customers?",
+        intent="company",
+        language="en",
+        use_llm=False,
+    )
+    assert "Rane TRW" in answer
+    assert answered_by == "deterministic"
+
+
+async def test_production_questions_are_not_mistaken_for_product_questions(
+    session, fixtures
+):
+    """"production" is not "product", and the difference is a whole branch.
+
+    Substring matching would route "what is our production loss today" to the
+    part master. That is the right data attached to the wrong noun — the one
+    failure this layer is built to avoid.
+    """
+    from app.ai.facts import build_question_facts
+
+    plant = fixtures["plant"]
+    _, intent = await build_question_facts(
+        session,
+        plant=plant,
+        question="What is our production loss today?",
+        as_of=NOW.date(),
+    )
+    assert intent != "company"
+
+
+async def test_the_answer_changes_language_but_never_changes_the_numbers(
+    session, fixtures
+):
+    """§7 — the floor reads Tamil and Hindi; the rupee figure is read by everyone.
+
+    The model is optional in this product: every caller falls back to the
+    deterministic answer, so an English-only fallback would mean picking Hindi
+    translated the buttons around the answer and nothing in it. What must not
+    move is the money — a figure re-rendered in another script stops matching
+    the paper it is reconciled against.
+    """
+    from app.ai.copilot import _deterministic_answer
+    from app.ai.facts import build_question_facts
+
+    plant = fixtures["plant"]
+    bundle, _ = await build_question_facts(
+        session, plant=plant, question="How are we doing today?", as_of=NOW.date()
+    )
+
+    rendered = {
+        language: _deterministic_answer(bundle, language)
+        for language in ("en", "ta", "hi")
+    }
+    assert len(set(rendered.values())) == 3, rendered
+
+    money = bundle.facts["today_recoverable_loss"]
+    for language, text in rendered.items():
+        assert money in text, language
+
+
+async def test_the_refusal_is_given_in_the_language_the_screen_is_in():
+    """A refusal a supervisor cannot read is indistinguishable from a failure."""
+    from datetime import date
+
+    from app.ai.copilot import NO_DATA_ANSWER, _answer
+    from app.ai.facts import FactBundle
+
+    bundle = FactBundle(plant_name="Demo Plant", as_of=date.today(), tier=0)
+    refusals = {}
+    for language in ("en", "ta", "hi"):
+        answer, _ = await _answer(
+            bundle=bundle,
+            question="what is the apple colour red or blue",
+            language=language,
+            use_llm=False,
+        )
+        refusals[language] = answer
+
+    assert refusals["en"] == NO_DATA_ANSWER
+    assert len(set(refusals.values())) == 3, refusals
+
+
+async def test_reading_an_answer_again_in_another_language_is_not_a_second_question(
+    session, fixtures
+):
+    """Switching the Ask screen to Hindi re-reads one question; it does not ask two.
+
+    The Copilot log is where every usage and adoption figure comes from, and a
+    supervisor changing the language of a conversation already on their screen
+    must not double it.
+    """
+    from sqlalchemy import func
+
+    from app.ai import copilot
+    from app.models import CopilotQuery
+
+    plant = fixtures["plant"]
+    question = "How are we doing today?"
+
+    async def logged() -> int:
+        return await session.scalar(
+            select(func.count(CopilotQuery.id)).where(CopilotQuery.plant_id == plant.id)
+        )
+
+    before = await logged()
+    english = await copilot.ask(
+        session, plant=plant, question=question, as_of=NOW.date(), use_llm=False
+    )
+    assert await logged() == before + 1
+
+    hindi = await copilot.ask(
+        session,
+        plant=plant,
+        question=question,
+        language="hi",
+        as_of=NOW.date(),
+        use_llm=False,
+        record=False,
+    )
+    assert await logged() == before + 1
+
+    # Same facts, same money, different words. That is what re-reading means.
+    assert hindi.facts == english.facts
+    assert hindi.answer != english.answer
+
+
 async def test_ask_refuses_off_topic_questions_like_apple_color():
     """Off-topic consumer questions are not plant data and must be refused."""
     from datetime import date

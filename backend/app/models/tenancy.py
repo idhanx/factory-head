@@ -112,7 +112,7 @@ class User(Base, TimestampMixin):
     phone: Mapped[str | None] = mapped_column(String(20), unique=True)
     full_name: Mapped[str] = mapped_column(String(200), nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    preferred_language: Mapped[str] = mapped_column(String(8), default="en")  # en | ta
+    preferred_language: Mapped[str] = mapped_column(String(8), default="en")  # en | ta | hi
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

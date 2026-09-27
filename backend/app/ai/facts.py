@@ -7,12 +7,14 @@ trusts and one wrong rupee figure that poisons every number on every screen.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.phrases import say
 from app.kernel import (
     CoachTier,
     DataSufficiency,
@@ -24,15 +26,68 @@ from app.models import (
     DowntimeEvent,
     DowntimeStatus,
     MemoryEntry,
+    Operator,
+    Part,
     PdcaState,
     Plant,
     ReasonCode,
     Recoverability,
+    Shift,
     ShiftSession,
     ShiftSessionStatus,
     Station,
+    UserPlantRole,
 )
 from app.services.reports import ranked_loss_report
+
+
+class Limit(str):
+    """A gap in what this plant's data can answer, that can say itself again.
+
+    A limit has two readers. The model is handed it as an instruction — "say so
+    plainly", "do not claim a machine always does anything" — and the person
+    who asked is shown it as part of the deterministic answer when no model is
+    available. Those are not the same sentence, and only the second one is ever
+    translated.
+
+    It subclasses ``str`` so everything that already treats a limit as a
+    finished English sentence keeps working untouched: the prompt, the stored
+    fact bundle, the dataset generator. What it adds is the memory of how it was
+    built, which is what lets the same gap be stated in Tamil or Hindi instead
+    of being a finished English sentence nobody can translate.
+    """
+
+    #: The English source, with ``{placeholders}`` — the key into the phrase book.
+    template: str
+    #: The values those placeholders take. Never translated: they are machine
+    #: codes and counts.
+    params: dict
+    #: English-only tail aimed at the model. Never shown to a person.
+    instruction: str
+
+    def __new__(cls, template: str, *, instruction: str = "", **params: object):
+        note = say("en", template, **params)
+        whole = f"{note} {instruction}".strip() if instruction else note
+        limit = super().__new__(cls, whole)
+        limit.template = template
+        limit.params = params
+        limit.instruction = instruction
+        return limit
+
+    def note(self, language: str = "en") -> str:
+        """The part a person reads, in their language."""
+        return say(language, self.template, **self.params)
+
+
+def limit_note(limit: str, language: str = "en") -> str:
+    """``limit`` as a person should read it.
+
+    Plain strings are accepted because the dataset generator builds bundles of
+    its own (``scripts/dataset/simulate.py``) and appends English sentences
+    directly. Those stay English rather than crashing the answer.
+    """
+    note = getattr(limit, "note", None)
+    return note(language) if callable(note) else str(limit)
 
 
 @dataclass(slots=True)
@@ -141,8 +196,12 @@ async def build_shift_facts(
         )
     else:
         bundle.limits.append(
-            "Not enough history for pattern analysis (needs about 4 weeks). "
-            "Do not claim a machine 'usually' or 'always' does anything."
+            Limit(
+                "Not enough history for pattern analysis (needs about 4 weeks).",
+                instruction=(
+                    "Do not claim a machine 'usually' or 'always' does anything."
+                ),
+            )
         )
 
     overdue = await _overdue_actions(session, plant=plant, as_of=as_of)
@@ -151,6 +210,261 @@ async def build_shift_facts(
 
     return bundle
 
+
+#: Questions about the company itself rather than about a number it produced:
+#: what we make, who we make it for, how many machines, which shifts, how many
+#: people. Every one of those is answered from the setup data the plant entered
+#: at onboarding (§15, templates T1-T7), so they are as grounded as a loss
+#: figure is — and refusing them as "not a factory question" was the product
+#: being obtuse about its own records.
+#:
+#: These also open the on-topic gate in `copilot.py`, which is the other half
+#: of the same decision.
+COMPANY_WORDS = (
+    # Single words are matched whole (see `mentions`), so "production" is never
+    # read as "product" and an output question is not answered with the part
+    # master.
+    "company",
+    "companies",
+    "business",
+    "firm",
+    "organisation",
+    "organization",
+    "factory",
+    "owner",
+    "owners",
+    "address",
+    "located",
+    "employee",
+    "employees",
+    "staff",
+    "workforce",
+    "headcount",
+    "customer",
+    "customers",
+    "client",
+    "clients",
+    "product",
+    "products",
+    "currency",
+    # Phrases are matched as written.
+    "plant name",
+    "our plant",
+    "about us",
+    "who are we",
+    "who owns",
+    "where are we",
+    "head office",
+    "how many people",
+    "how many machines",
+    "how many stations",
+    "how many operators",
+    "part number",
+    "what do we make",
+    "what do we produce",
+    "working days",
+    "shift timing",
+    "go live",
+    "go-live",
+    "since when",
+    # Tamil and Hindi stems, matched as written. Deliberately narrow: "plant"
+    # and "factory" are left out of both, because ஆலையில் இன்று and प्लांट में
+    # आज open a question about today's losses, not about the company.
+    "நிறுவன",
+    "கம்பெனி",
+    "வாடிக்கையாள",
+    "உரிமையாள",
+    "ஊழியர்",
+    "பணியாளர்",
+    "எத்தனை இயந்திர",
+    "எத்தனை பேர்",
+    "ஷிப்ட் நேர",
+    "கஸ்டமர்",
+    "कंपनी",
+    "ग्राहक",
+    "मालिक",
+    "कर्मचारी",
+    "स्टाफ",
+    "स्टाफ़",
+    "उत्पाद",
+    "बनाते हैं",
+    "बनाती है",
+    "कितनी मशीन",
+    "कितने लोग",
+    "कितने ऑपरेटर",
+    "शिफ़्ट का समय",
+    "शिफ्ट का समय",
+)
+
+
+#: Which part of the company profile a question is actually about, and the
+#: facts that answer it.
+#:
+#: Asking who our customers are and being read back the machine count, the
+#: shift pattern and the working-day calendar is the same confidently
+#: irrelevant reply the memory branch exists to avoid. So the profile is cut
+#: down to what was asked for, and only a question with no particular aspect to
+#: it — "tell me about the company" — gets all of it.
+COMPANY_ASPECTS: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
+    (
+        ("name", "called", "நாம", "பெயர்", "नाम"),
+        ("location",),
+    ),
+    (
+        ("customer", "customers", "client", "clients", "வாடிக்கையாள", "கஸ்டமர்", "ग्राहक"),
+        ("customers", "part_families"),
+    ),
+    (
+        (
+            "product",
+            "products",
+            "part number",
+            "what do we make",
+            "what do we produce",
+            "தயாரி",
+            "பாக",
+            "उत्पाद",
+            "बनात",
+            "पुर्ज़",
+        ),
+        ("active_part_numbers", "part_families", "customers"),
+    ),
+    (
+        ("machine", "machines", "station", "stations", "இயந்திர", "मशीन"),
+        ("machines", "sections"),
+    ),
+    (
+        (
+            "employee",
+            "employees",
+            "staff",
+            "people",
+            "workforce",
+            "headcount",
+            "operator",
+            "operators",
+            "ஊழியர்",
+            "பணியாள",
+            "कर्मचारी",
+            "स्टाफ",
+            "लोग",
+        ),
+        ("operators_on_roll", "people_with_a_login"),
+    ),
+    (
+        ("shift", "shifts", "timing", "timings", "ஷிப்ட்", "शिफ़्ट", "शिफ्ट"),
+        ("shift_pattern", "working_days_per_year"),
+    ),
+    (
+        ("where", "address", "located", "location", "இடம்", "எங்கே", "जगह", "कहाँ"),
+        ("location",),
+    ),
+    (
+        ("since", "go live", "go-live", "how long", "எப்போதிருந்து", "कब से"),
+        ("running_since", "days_live", "shifts_of_history"),
+    ),
+)
+
+#: On every company answer, whatever was asked. A profile that does not say
+#: whose profile it is can be read against the wrong plant.
+COMPANY_ALWAYS = ("company_name", "plant_code")
+
+
+def mentions(text: str, words: tuple[str, ...]) -> bool:
+    """Does this question use one of these words?
+
+    Single words match whole words only. Substring matching is what turns
+    "production" into a question about products and "reasonable" into a
+    question about reason codes — a wrong branch produces the right data
+    attached to the wrong noun, which is the one failure §3 Layer 3 is built
+    to avoid.
+    """
+    tokens = set(re.findall(r"[a-z0-9'-]+", text.lower()))
+    return any(
+        word in tokens
+        # Whole-word matching only makes sense for a language that separates
+        # words the way English does. Tamil and Hindi inflect the noun itself —
+        # நிறுவனம் becomes நிறுவனத்தின், कंपनी becomes कंपनी का — so those are
+        # listed as stems and matched as written.
+        if word.isascii() and " " not in word
+        else word in text
+        for word in words
+    )
+
+
+#: What each branch listens for. Matched as substrings rather than whole words,
+#: which is why "defects" finds "defect" and "weekly" finds "week" — a blunt
+#: match into the right branch beats a precise one into the fallback.
+#:
+#: Each list carries the Tamil and Hindi a question is actually typed in. The
+#: language picker sets what the answer comes back in, but somebody reading the
+#: screen in Hindi types in Hindi, and a question that classified as
+#: "unrecognised" purely for being written in the language the product just
+#: offered them is the picker breaking the thing it was added to improve.
+PERIOD_WORDS = (
+    "week",
+    "month",
+    "so far",
+    "total",
+    "வாரம்",
+    "வார",
+    "மாதம்",
+    "மாத",
+    "हफ़्त",
+    "हफ्त",
+    "सप्ताह",
+    "महीन",
+)
+
+MEMORY_WORDS = (
+    "ever",
+    "before",
+    "seen",
+    "last time",
+    "previously",
+    "how do we fix",
+    "what fixed",
+    "முன்பு",
+    "கடைசி முறை",
+    "எப்படி சரி",
+    "पहले कभी",
+    "पिछली बार",
+    "कैसे ठीक",
+    "पहले भी",
+)
+
+QUALITY_WORDS = (
+    "defect",
+    "reject",
+    "quality",
+    "ppm",
+    "burr",
+    "scrap",
+    "குறைபாடு",
+    "தரம்",
+    "நிராகரி",
+    "ஸ்கிராப்",
+    "दोष",
+    "रिजेक्ट",
+    "गुणवत्ता",
+    "क्वालिटी",
+    "स्क्रैप",
+)
+
+PATTERN_WORDS = (
+    "why",
+    "keep",
+    "always",
+    "usually",
+    "pattern",
+    "ஏன்",
+    "திரும்பத் திரும்ப",
+    "எப்போதும்",
+    "क्यों",
+    "बार-बार",
+    "बार बार",
+    "हमेशा",
+)
 
 #: Questions that really are about the state of the plant right now. Anything
 #: that matches none of the branches below is answered with today's numbers too,
@@ -165,6 +479,12 @@ TODAY_WORDS = (
     "how is the plant",
     "this shift",
     "status",
+    "இன்று",
+    "இப்போது",
+    "தற்போது",
+    "आज",
+    "अभी",
+    "इस समय",
 )
 
 
@@ -190,7 +510,17 @@ async def build_question_facts(
     if station_code:
         bundle.facts["about_station"] = station_code
 
-    if any(word in text for word in ("week", "month", "so far", "total")):
+    # Asked first. "How many people work here in total?" contains "total" and
+    # would otherwise be answered with a week of losses.
+    if mentions(text, COMPANY_WORDS):
+        intent = "company"
+        facts, evidence = await _company_facts(
+            session, plant=plant, sufficiency=sufficiency, text=text
+        )
+        bundle.facts.update(facts)
+        bundle.evidence = evidence
+
+    elif any(word in text for word in PERIOD_WORDS):
         intent = "period_loss"
         start = as_of - timedelta(days=7)
         report = await ranked_loss_report(session, plant=plant, start=start, end=as_of)
@@ -215,40 +545,34 @@ async def build_question_facts(
     # contains a quality keyword but is a Factory Memory question, and answering
     # it with this month's PPM is exactly the kind of confidently-irrelevant
     # reply that loses trust.
-    elif any(
-        phrase in text
-        for phrase in (
-            "ever",
-            "before",
-            "seen",
-            "last time",
-            "previously",
-            "how do we fix",
-            "what fixed",
-        )
-    ):
+    elif any(phrase in text for phrase in MEMORY_WORDS):
         intent = "memory"
         bundle.evidence = await _memory_matches(session, plant=plant, query=question)
         if not bundle.evidence:
             bundle.limits.append(
-                "Factory Memory has no recorded fix matching this. Say so plainly."
+                Limit(
+                    "Factory Memory has no recorded fix matching this.",
+                    instruction="Say so plainly.",
+                )
             )
 
-    elif any(
-        word in text for word in ("defect", "reject", "quality", "ppm", "burr", "scrap")
-    ):
+    elif any(word in text for word in QUALITY_WORDS):
         intent = "quality"
         bundle.facts.update(await _quality_facts(session, plant=plant, as_of=as_of))
 
-    elif any(word in text for word in ("why", "keep", "always", "usually", "pattern")):
+    elif any(word in text for word in PATTERN_WORDS):
         intent = "pattern"
         if tier < CoachTier.PATTERN:
             # §3 Layer 3 — the tier is enforced, not left to a disclaimer.
             bundle.limits.append(
-                f"Only {sufficiency.complete_shifts} shifts of history exist. "
-                "Pattern questions cannot be answered yet. Say: 'I've seen "
-                f"{sufficiency.distinct_events} events like this; I'll give you "
-                "pattern analysis once I've seen more.'"
+                Limit(
+                    "Only {shifts} shifts of history exist, so pattern questions "
+                    "cannot be answered yet. I have seen {events} events like "
+                    "this; I'll give you pattern analysis once I've seen more.",
+                    instruction="Say that rather than describing a pattern.",
+                    shifts=sufficiency.complete_shifts,
+                    events=sufficiency.distinct_events,
+                )
             )
         else:
             patterns = await _recurring_patterns(
@@ -257,9 +581,15 @@ async def build_question_facts(
             bundle.facts["recurring_patterns"] = patterns
             if station_code and not patterns:
                 bundle.limits.append(
-                    f"{station_code} has no recurring pattern in the last 4 weeks "
-                    "(nothing repeated three or more times). Say that plainly "
-                    "rather than describing a different machine."
+                    Limit(
+                        "{station} has no recurring pattern in the last 4 weeks "
+                        "— nothing repeated three or more times.",
+                        instruction=(
+                            "Say that plainly rather than describing a different "
+                            "machine."
+                        ),
+                        station=station_code,
+                    )
                 )
 
     else:
@@ -281,13 +611,141 @@ async def build_question_facts(
         bundle.evidence = report.recoverable[:5]
         if intent == "unrecognised":
             bundle.limits.append(
-                "That question was not understood, so this is today's position "
-                "rather than an answer to it. Losses for a period, defects and "
-                "quality, why a machine keeps stopping, and what fixed something "
-                "last time can all be asked for by name."
+                Limit(
+                    "That question was not understood, so this is today's "
+                    "position rather than an answer to it. Losses for a period, "
+                    "defects and quality, why a machine keeps stopping, what "
+                    "fixed something last time, and the company's own details "
+                    "can all be asked for by name."
+                )
             )
 
     return bundle, intent
+
+
+async def _company_facts(
+    session: AsyncSession, *, plant: Plant, sufficiency: DataSufficiency, text: str
+) -> tuple[dict, list[dict]]:
+    """What this plant *is*, as opposed to how it is doing.
+
+    Every line comes from the setup data entered at onboarding — the machine
+    list, the part master, the shift pattern, the people who have a login. A
+    field the plant never filled in is left out rather than answered with a
+    placeholder: §4.1's don't-block rule means half these columns are legally
+    empty, and "Location: not recorded" is noise in an answer.
+    """
+    machines = await session.scalar(
+        select(func.count(Station.id)).where(
+            Station.plant_id == plant.id, Station.is_active.is_(True)
+        )
+    )
+    sections = (
+        await session.scalars(
+            select(Station.section)
+            .where(Station.plant_id == plant.id, Station.is_active.is_(True))
+            .distinct()
+        )
+    ).all()
+    parts = await session.scalar(
+        select(func.count(Part.id)).where(
+            Part.plant_id == plant.id, Part.is_active.is_(True)
+        )
+    )
+    families = (
+        await session.scalars(
+            select(Part.part_family)
+            .where(
+                Part.plant_id == plant.id,
+                Part.is_active.is_(True),
+                Part.part_family.is_not(None),
+            )
+            .distinct()
+        )
+    ).all()
+    # Customers are a name and nothing more (§14.1). Capped, because a plant
+    # with sixty of them does not want all sixty read out on a phone.
+    customers = (
+        await session.scalars(
+            select(Part.customer_name)
+            .where(
+                Part.plant_id == plant.id,
+                Part.is_active.is_(True),
+                Part.customer_name.is_not(None),
+            )
+            .distinct()
+            .order_by(Part.customer_name)
+        )
+    ).all()
+    operators = await session.scalar(
+        select(func.count(Operator.id)).where(
+            Operator.plant_id == plant.id, Operator.is_active.is_(True)
+        )
+    )
+    people = await session.scalar(
+        select(func.count(UserPlantRole.id)).where(UserPlantRole.plant_id == plant.id)
+    )
+    shifts = (
+        await session.scalars(
+            select(Shift)
+            .where(Shift.plant_id == plant.id, Shift.is_active.is_(True))
+            .order_by(Shift.display_order)
+        )
+    ).all()
+
+    profile: dict = {
+        "company_name": plant.name,
+        "plant_code": plant.code,
+    }
+    facts = profile
+    if plant.location:
+        facts["location"] = plant.location
+    facts["machines"] = int(machines or 0)
+    if sections:
+        facts["sections"] = ", ".join(
+            sorted(getattr(section, "value", section) for section in sections)
+        )
+    if shifts:
+        facts["shift_pattern"] = " · ".join(
+            f"{shift.name} {shift.start_time:%H:%M}-{shift.end_time:%H:%M}"
+            for shift in shifts
+        )
+    facts["active_part_numbers"] = int(parts or 0)
+    if families:
+        facts["part_families"] = ", ".join(sorted(families))
+    if customers:
+        facts["customers"] = ", ".join(customers[:8])
+    facts["operators_on_roll"] = int(operators or 0)
+    facts["people_with_a_login"] = int(people or 0)
+    facts["working_days_per_year"] = plant.working_days_per_year
+    facts["currency"] = plant.currency
+    if plant.go_live_date:
+        facts["running_since"] = plant.go_live_date.isoformat()
+    facts["days_live"] = sufficiency.days_live
+    facts["shifts_of_history"] = sufficiency.complete_shifts
+
+    evidence = [
+        {
+            "shift": shift.name,
+            "starts": shift.start_time.strftime("%H:%M"),
+            "ends": shift.end_time.strftime("%H:%M"),
+            "break_minutes": shift.break_minutes,
+            **({"weekly_off": shift.weekly_off} if shift.weekly_off else {}),
+        }
+        for shift in shifts
+    ]
+
+    wanted: set[str] = set()
+    for words, keys in COMPANY_ASPECTS:
+        if mentions(text, words):
+            wanted.update(keys)
+    if not wanted:
+        return profile, evidence
+
+    wanted.update(COMPANY_ALWAYS)
+    return (
+        {key: value for key, value in profile.items() if key in wanted},
+        evidence if "shift_pattern" in wanted else [],
+    )
 
 
 async def _station_mentioned(

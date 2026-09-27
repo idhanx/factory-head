@@ -562,3 +562,46 @@ async def test_sensor_ingest_refuses_a_missing_or_wrong_token(api, fixtures, mon
     ).status_code == 401
     ok = await api["client"].post(url, json=body, headers={"X-Ingest-Token": "device-secret"})
     assert ok.status_code == 200
+
+
+async def test_ask_answers_in_the_language_the_screen_is_set_to(api, monkeypatch):
+    """§7 — the Ask screen carries its conversation across a language switch.
+
+    Hindi is one of the three the floor reads, and choosing it has to change
+    the answer, not only the furniture around it. The re-read goes to a
+    separate route because it is the same question being shown again: the
+    numbers in it must be the ones already given, and the Copilot log must not
+    grow a second entry for a supervisor changing the screen.
+    """
+    from app.core.config import settings
+
+    # No model in CI, and none needed: the deterministic answer is the one
+    # every plant without a GPU actually gets, so it is the one worth testing.
+    monkeypatch.setattr(settings, "ollama_enabled", False)
+
+    client, headers = api["client"], api["as"]("supervisor")
+    question = "What is our company name?"
+
+    english = await client.post(
+        "/api/v1/ai/copilot/ask", json={"question": question}, headers=headers
+    )
+    assert english.status_code == 200
+    assert english.json()["intent"] == "company"
+
+    hindi = await client.post(
+        "/api/v1/ai/copilot/rephrase",
+        json={"question": question, "language": "hi"},
+        headers=headers,
+    )
+    assert hindi.status_code == 200
+    assert hindi.json()["answer"] != english.json()["answer"]
+    assert hindi.json()["facts"] == english.json()["facts"]
+
+    # A language the product does not speak is refused rather than quietly
+    # answered in English.
+    rejected = await client.post(
+        "/api/v1/ai/copilot/ask",
+        json={"question": question, "language": "fr"},
+        headers=headers,
+    )
+    assert rejected.status_code == 422
